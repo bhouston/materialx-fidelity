@@ -50,20 +50,6 @@ async function findMissingFiles(filePaths: string[]): Promise<string[]> {
   return missing;
 }
 
-async function resolveThreeRoot(thirdPartyRoot: string): Promise<string> {
-  const candidates = [join(thirdPartyRoot, 'three.js'), join(thirdPartyRoot, 'threejs')];
-  for (const candidate of candidates) {
-    try {
-      await access(candidate);
-      return candidate;
-    } catch {
-      // try the next candidate
-    }
-  }
-
-  throw new Error(`Unable to locate Three.js root under ${thirdPartyRoot}. Tried: ${candidates.join(', ')}`);
-}
-
 function readGlobalError(page: Page): Promise<string | undefined> {
   return page.evaluate(() => {
     const value = Reflect.get(globalThis, '__MTLX_CAPTURE_ERROR__');
@@ -115,20 +101,14 @@ class ThreeJsRenderer implements FidelityRenderer {
     }
 
     try {
-      const threeRoot = await resolveThreeRoot(this.thirdPartyRoot);
-      const requiredThreeFiles = [
-        join(threeRoot, 'build', 'three.webgpu.js'),
-        join(threeRoot, 'build', 'three.tsl.js'),
-        join(threeRoot, 'examples', 'jsm', 'loaders', 'MaterialXLoader.js'),
-        join(threeRoot, 'examples', 'jsm', 'loaders', 'GLTFLoader.js'),
-        join(threeRoot, 'examples', 'jsm', 'loaders', 'HDRLoader.js'),
-      ];
-      const missingFiles = await findMissingFiles(requiredThreeFiles);
+      const samplesRoot = join(this.thirdPartyRoot, 'materialx-samples');
+      const viewerRoot = join(samplesRoot, 'viewer');
+      const missingFiles = await findMissingFiles([
+        join(viewerRoot, VIEWER_HDR_FILENAME),
+        join(viewerRoot, VIEWER_MODEL_FILENAME),
+      ]);
       if (missingFiles.length > 0) {
-        return {
-          success: false,
-          message: `Missing required Three.js files: ${missingFiles.join(', ')}`,
-        };
+        return { success: false, message: `Missing required viewer assets: ${missingFiles.join(', ')}` };
       }
 
       const browser = await launchGpuBrowser();
@@ -154,24 +134,12 @@ class ThreeJsRenderer implements FidelityRenderer {
       }
     }
 
-    const threeRoot = await resolveThreeRoot(this.thirdPartyRoot);
-    const samplesRoot = join(this.thirdPartyRoot, 'materialX-samples');
+    const samplesRoot = join(this.thirdPartyRoot, 'materialx-samples');
     const viewerRoot = join(samplesRoot, 'viewer');
-
-    const threeWebGpuPath = join(threeRoot, 'build', 'three.webgpu.js');
-    const threeTslPath = join(threeRoot, 'build', 'three.tsl.js');
-    const materialXLoaderPath = join(threeRoot, 'examples', 'jsm', 'loaders', 'MaterialXLoader.js');
-    const gltfLoaderPath = join(threeRoot, 'examples', 'jsm', 'loaders', 'GLTFLoader.js');
-    const hdrLoaderPath = join(threeRoot, 'examples', 'jsm', 'loaders', 'HDRLoader.js');
     const envPath = join(viewerRoot, VIEWER_HDR_FILENAME);
     const modelPath = join(viewerRoot, VIEWER_MODEL_FILENAME);
 
     await Promise.all([
-      assertFileExists(threeWebGpuPath),
-      assertFileExists(threeTslPath),
-      assertFileExists(materialXLoaderPath),
-      assertFileExists(gltfLoaderPath),
-      assertFileExists(hdrLoaderPath),
       assertFileExists(envPath),
       assertFileExists(modelPath),
     ]);
@@ -182,26 +150,6 @@ class ThreeJsRenderer implements FidelityRenderer {
       root: viewerAppRoot,
       logLevel: 'error',
       plugins: [react()],
-      resolve: {
-        alias: [
-          {
-            find: 'three/webgpu',
-            replacement: threeWebGpuPath,
-          },
-          {
-            find: 'three/tsl',
-            replacement: threeTslPath,
-          },
-          {
-            find: 'three/addons/',
-            replacement: `${join(threeRoot, 'examples', 'jsm').replaceAll('\\', '/')}/`,
-          },
-          {
-            find: 'three',
-            replacement: threeWebGpuPath,
-          },
-        ],
-      },
       server: {
         host: '127.0.0.1',
         port: 0,

@@ -17,6 +17,8 @@ RUN pnpm fetch --reporter=silent
 
 COPY . .
 
+RUN test -d /app/third_party/materialx-samples/materials
+
 RUN pnpm install --frozen-lockfile --prefer-offline
 
 RUN pnpm --filter @materialx-fidelity/viewer build

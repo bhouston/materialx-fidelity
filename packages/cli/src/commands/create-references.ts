@@ -8,6 +8,19 @@ import { createRenderer as createThreeJsRenderer } from '@materialx-fidelity/ren
 import { humanizeTime } from 'humanize-units';
 import { defineCommand } from 'yargs-file-commands';
 
+function inferRepoRoot(invocationCwd: string): string {
+  if (path.basename(invocationCwd) === 'cli' && path.basename(path.dirname(invocationCwd)) === 'packages') {
+    return path.dirname(path.dirname(invocationCwd));
+  }
+
+  return invocationCwd;
+}
+
+function resolveThirdPartyRoot(invocationCwd: string): string {
+  const repoRoot = inferRepoRoot(invocationCwd);
+  return path.join(repoRoot, 'third_party');
+}
+
 function formatElapsed(ms: number): string {
   const elapsedSeconds = Math.max(0, ms / 1000);
   return humanizeTime(elapsedSeconds, { unitSeparator: ' ' });
@@ -98,7 +111,7 @@ function InkCreateReferencesApp({ args, onComplete, onError }: InkCreateReferenc
 
   useEffect(() => {
     let active = true;
-    const materialsRoot = path.join(args.thirdPartyRoot, 'materialX-samples', 'materials');
+    const materialsRoot = path.join(args.thirdPartyRoot, 'materialx-samples', 'materials');
 
     const applyProgress = (event: CreateReferencesProgressEvent) => {
       if (!active) {
@@ -238,11 +251,6 @@ export const command = defineCommand({
         type: 'array',
         describe: 'Renderer names to use. Supports repeated values and comma-separated lists.',
       })
-      .option('third-party-root', {
-        type: 'string',
-        default: '../',
-        describe: 'Path containing third-party repositories such as materialX-samples and threejs.',
-      })
       .option('concurrency', {
         type: 'number',
         default: 1,
@@ -258,7 +266,7 @@ export const command = defineCommand({
       }),
   handler: async (argv) => {
     const invocationCwd = process.env.INIT_CWD ?? process.cwd();
-    const thirdPartyRoot = path.resolve(invocationCwd, argv['third-party-root']);
+    const thirdPartyRoot = resolveThirdPartyRoot(invocationCwd);
     const renderers: FidelityRenderer[] = [
       createMaterialXViewRenderer(),
       createThreeJsRenderer({ thirdPartyRoot }),
@@ -276,7 +284,7 @@ export const command = defineCommand({
       materialSelectors: [...new Set(materialSelectors)],
       filter: argv.filter,
     };
-    const materialsRoot = path.join(thirdPartyRoot, 'materialX-samples', 'materials');
+    const materialsRoot = path.join(thirdPartyRoot, 'materialx-samples', 'materials');
     const isInteractive = process.stdout.isTTY && !process.env.CI;
     const result = isInteractive
       ? await runCreateReferencesWithInk(commandArgs)

@@ -4,7 +4,7 @@ import { z } from 'zod';
 import * as THREE from 'three/webgpu';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
-import { MaterialXLoader } from 'three/addons/loaders/MaterialXLoader.js';
+import { MaterialXLoader } from './vendor/MaterialXLoader.js';
 
 declare global {
   var __MTLX_CAPTURE_DONE__: boolean | undefined;

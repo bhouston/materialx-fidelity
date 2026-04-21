@@ -21,15 +21,29 @@ The initial scaffold focuses on reference-image generation:
 - Node.js 24+
 - pnpm 10+
 - `materialxview` (or `MaterialXView`) available on your `PATH`
-- third-party root at `../` containing `materialX-samples` and `three.js` repositories
+- `third_party/materialx-samples` initialized as a git submodule
 
 Expected third-party layout:
 
-- `../materialX-samples/materials/**/material.mtlx`
-- `../materialX-samples/viewer/san_giuseppe_bridge_2k.hdr`
-- `../materialX-samples/viewer/ShaderBall.glb`
-- `../three.js/build/three.module.js`
-- `../three.js/examples/jsm/loaders/MaterialXLoader.js`
+- `third_party/materialx-samples/materials/**/material.mtlx`
+- `third_party/materialx-samples/viewer/san_giuseppe_bridge_2k.hdr`
+- `third_party/materialx-samples/viewer/ShaderBall.glb`
+
+### Initialize Submodules
+
+Fresh clone:
+
+```bash
+git clone --recurse-submodules <repo-url>
+```
+
+Existing clone:
+
+```bash
+git submodule update --init --recursive
+```
+
+This repo intentionally does not include a `three.js` submodule. The Three.js renderer uses the npm `three` package plus vendored MaterialX loader files under `packages/renderer-threejs/viewer/src/vendor`.
 
 ## Install
 
@@ -56,7 +70,7 @@ pnpm cli create-references --renderers materialxview
 ```
 
 ```bash
-pnpm cli create-references --renderers threejs --third-party-root ../
+pnpm cli create-references --renderers threejs
 ```
 
 This command writes `<renderer-name>.webp` in each directory containing a `material.mtlx`.
@@ -69,7 +83,6 @@ Currently supported renderers:
 
 Optional flags:
 
-- `--third-party-root <path>` override default `../`
 - `--renderers <name[,name...]>` optional renderer filter; supports repeated flags and comma-separated values
 - `--materials <selector[,selector...]>` optional material filter; supports repeated flags, comma-separated values, substring matches, and regex selectors (`re:...` or `/.../flags`)
 - `--concurrency <number>` default `1`
@@ -97,14 +110,6 @@ pnpm viewer
 ```
 
 The viewer scans MaterialX materials and looks for images for the built-in renderer list (`materialxview`, `threejs`).
-
-- `THIRD_PARTY_ROOT` (optional, default `../`) - root containing `materialX-samples`.
-
-Example:
-
-```bash
-THIRD_PARTY_ROOT=../ pnpm viewer
-```
 
 The page groups materials by type (`open_pbr_surface`, `gltf_pbr`, `standard_surface`) and displays each renderer image (`<renderer>.webp`) side by side. Missing images render as a placeholder tile.
 

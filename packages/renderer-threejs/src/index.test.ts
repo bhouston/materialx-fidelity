@@ -48,14 +48,8 @@ afterEach(async () => {
 describe('threejs renderer', () => {
   it('creates a new page for each render and closes it', async () => {
     const thirdPartyRoot = await makeTempDir('third-party-');
-    const samplesRoot = path.join(thirdPartyRoot, 'materialX-samples');
+    const samplesRoot = path.join(thirdPartyRoot, 'materialx-samples');
     const viewerRoot = path.join(samplesRoot, 'viewer');
-
-    await createFile(path.join(thirdPartyRoot, 'three.js', 'build', 'three.webgpu.js'));
-    await createFile(path.join(thirdPartyRoot, 'three.js', 'build', 'three.tsl.js'));
-    await createFile(path.join(thirdPartyRoot, 'three.js', 'examples', 'jsm', 'loaders', 'MaterialXLoader.js'));
-    await createFile(path.join(thirdPartyRoot, 'three.js', 'examples', 'jsm', 'loaders', 'GLTFLoader.js'));
-    await createFile(path.join(thirdPartyRoot, 'three.js', 'examples', 'jsm', 'loaders', 'HDRLoader.js'));
     await createFile(path.join(viewerRoot, 'san_giuseppe_bridge_2k.hdr'));
     await createFile(path.join(viewerRoot, 'ShaderBall.glb'));
 

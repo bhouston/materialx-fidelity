@@ -3,7 +3,7 @@ import path from 'node:path'
 import { createRenderer as createMaterialXViewRenderer } from '@materialx-fidelity/renderer-materialxview'
 import { createRenderer as createThreeJsRenderer } from '@materialx-fidelity/renderer-threejs'
 
-const MATERIAL_SOURCE_BASE_URL = 'https://github.com/bhouston/materialX-samples/blob/main/materials'
+const MATERIAL_SOURCE_BASE_URL = 'https://github.com/bhouston/materialx-samples/blob/main/materials'
 const MATERIAL_TYPE_ORDER = ['open_pbr_surface', 'gltf_pbr', 'standard_surface'] as const
 interface MaterialDescriptor {
   type: string
@@ -56,8 +56,8 @@ function inferRepoRoot(invocationCwd: string): string {
 export function resolveViewerRoots(): ViewerRoots {
   const invocationCwd = process.env.INIT_CWD ?? process.cwd()
   const repoRoot = inferRepoRoot(invocationCwd)
-  const thirdPartyRoot = path.resolve(repoRoot, process.env.THIRD_PARTY_ROOT ?? '../')
-  const materialsRoot = path.join(thirdPartyRoot, 'materialX-samples', 'materials')
+  const thirdPartyRoot = path.join(repoRoot, 'third_party')
+  const materialsRoot = path.join(thirdPartyRoot, 'materialx-samples', 'materials')
 
   return {
     repoRoot,

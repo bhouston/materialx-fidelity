@@ -54,8 +54,6 @@ describe('create-references command', () => {
         renderers: ['materialxview'],
         materials: undefined,
         filter: undefined,
-        'third-party-root': '../',
-        thirdPartyRoot: '../',
         concurrency: 2,
         _: [],
         $0: 'mtlx-fidelity',
@@ -77,6 +75,7 @@ describe('create-references command', () => {
       thirdPartyRoot: expect.any(String),
       concurrency: 2,
     });
+    expect(firstCall?.[0].thirdPartyRoot.endsWith('/third_party')).toBe(true);
     expect(firstCall?.[0].renderers).toHaveLength(2);
   });
 
@@ -85,8 +84,6 @@ describe('create-references command', () => {
       renderers: ['materialxview,threejs'],
       materials: ['standard_surface', '/gltf_pbr/i'],
       filter: 'stdlib',
-      'third-party-root': '../',
-      thirdPartyRoot: '../',
       concurrency: 1,
       _: [],
       $0: 'mtlx-fidelity',
@@ -105,8 +102,6 @@ describe('create-references command', () => {
       renderers: undefined,
       materials: undefined,
       filter: undefined,
-      'third-party-root': '../',
-      thirdPartyRoot: '../',
       concurrency: 1,
       _: [],
       $0: 'mtlx-fidelity',

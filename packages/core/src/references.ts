@@ -83,14 +83,14 @@ function materialMatchesSelector(materialPath: string, materialsRoot: string, se
 }
 
 export async function createReferences(options: CreateReferencesOptions): Promise<CreateReferencesResult> {
-  const samplesRoot = path.join(options.thirdPartyRoot, 'materialX-samples');
+  const samplesRoot = path.join(options.thirdPartyRoot, 'materialx-samples');
   const materialsRoot = path.join(samplesRoot, 'materials');
   const viewerRoot = path.join(samplesRoot, 'viewer');
 
   try {
     await access(samplesRoot);
   } catch {
-    throw new Error(`Missing required materialX-samples directory at ${samplesRoot}.`);
+    throw new Error(`Missing required materialx-samples directory at ${samplesRoot}.`);
   }
 
   try {
