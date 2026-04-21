@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { createServerFn } from '@tanstack/react-start'
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, DownloadIcon } from 'lucide-react'
+import { useGoogleAnalytics } from 'tanstack-router-ga4'
 import { getViewerIndexData } from '#/lib/material-index'
 
 const getViewerData = createServerFn({
@@ -18,6 +19,31 @@ function toAnchorId(value: string): string {
 
 function App() {
   const data = Route.useLoaderData()
+  const ga = useGoogleAnalytics()
+
+  const trackMaterialAction = (
+    action: 'download_mtlx' | 'open_live_viewer' | 'open_source',
+    material: {
+      type: string
+      name: string
+      downloadMtlxZipUrl: string
+      liveViewerUrl: string
+      sourceUrl: string
+    },
+  ) => {
+    const destinationUrl =
+      action === 'download_mtlx'
+        ? material.downloadMtlxZipUrl
+        : action === 'open_live_viewer'
+          ? material.liveViewerUrl
+          : material.sourceUrl
+
+    ga.event(action, {
+      material_name: material.name,
+      material_type: material.type,
+      destination_url: destinationUrl,
+    })
+  }
 
   return (
     <main className="mx-auto flex w-full max-w-[1120px] flex-col gap-8 px-4 py-8 sm:px-6">
@@ -151,26 +177,31 @@ function App() {
                           #
                         </a>
                       </h3>
-                      <div className="ml-auto flex items-center gap-3 text-sm">
+                      <div className="ml-auto flex flex-wrap items-center justify-end gap-2 text-sm">
+   
                         <a
-                          className="inline-flex items-center gap-1 text-primary underline underline-offset-2 hover:no-underline"
+                          className="inline-flex items-center gap-1 rounded-none border border-border bg-muted/40 px-2.5 py-1.5 font-normal text-foreground transition-colors hover:border-primary/40 hover:bg-muted/60"
+                          download
+                          href={material.downloadMtlxZipUrl}
+                          onClick={() => trackMaterialAction('download_mtlx', material)}
+                        >
+                         <DownloadIcon className="size-3.5" />
+                        <span>Download</span>
+                        </a>
+                        <a
+                          className="inline-flex items-center gap-1 rounded-none border border-border bg-muted/40 px-2.5 py-1.5 font-normal text-foreground transition-colors hover:border-primary/40 hover:bg-muted/60"
                           href={material.liveViewerUrl}
+                          onClick={() => trackMaterialAction('open_live_viewer', material)}
                           rel="noreferrer"
                           target="_blank"
                         >
-                          <span>Live Viewer</span>
+                          <span>Viewer</span>
                           <ExternalLink aria-hidden="true" className="size-3.5" />
                         </a>
-                        <a
-                          className="inline-flex items-center gap-1 text-primary underline underline-offset-2 hover:no-underline"
-                          download
-                          href={material.downloadMtlxZipUrl}
-                        >
-                          <span>Download Mtlx.zip</span>
-                        </a>
-                        <a
-                          className="inline-flex items-center gap-1 text-primary underline underline-offset-2 hover:no-underline"
+                             <a
+                          className="inline-flex items-center gap-1 rounded-none border border-border bg-muted/40 px-2.5 py-1.5 font-normal text-foreground transition-colors hover:border-primary/40 hover:bg-muted/60"
                           href={material.sourceUrl}
+                          onClick={() => trackMaterialAction('open_source', material)}
                           rel="noreferrer"
                           target="_blank"
                         >
