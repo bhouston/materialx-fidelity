@@ -3,7 +3,7 @@ import path from 'node:path'
 import { createRenderer as createMaterialXViewRenderer } from '@materialx-fidelity/renderer-materialxview'
 import { createRenderer as createThreeJsRenderer } from '@materialx-fidelity/renderer-threejs'
 
-const MATERIAL_SOURCE_BASE_URL = 'https://github.com/bhouston/materialx-samples/blob/main/materials'
+const MATERIAL_SOURCE_BASE_URL = 'https://github.com/bhouston/materialx-samples/tree/main/materials'
 const MATERIAL_TYPE_ORDER = ['open_pbr_surface', 'gltf_pbr', 'standard_surface'] as const
 interface MaterialDescriptor {
   type: string
@@ -39,7 +39,7 @@ export interface ViewerRoots {
 }
 
 function toGithubSourceUrl(relativeDirectory: string): string {
-  return `${MATERIAL_SOURCE_BASE_URL}/${relativeDirectory.replaceAll(path.sep, '/')}/material.mtlx`
+  return `${MATERIAL_SOURCE_BASE_URL}/${relativeDirectory.replaceAll(path.sep, '/')}`
 }
 
 function inferRepoRoot(invocationCwd: string): string {
