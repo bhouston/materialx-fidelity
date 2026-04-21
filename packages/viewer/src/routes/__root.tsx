@@ -18,7 +18,7 @@ export const Route = createRootRoute({
         content: 'width=device-width, initial-scale=1',
       },
       {
-        title: 'MaterialX Fidelity Reference Viewer',
+        title: 'MaterialX Fidelity Viewer',
       },
     ],
     links: [

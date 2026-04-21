@@ -79,7 +79,7 @@ These values are intentionally aligned with `MaterialXView` defaults and its sce
 
 ## Viewer
 
-Run the MaterialX fidelity reference viewer:
+Run the MaterialX Fidelity Viewer:
 
 ```bash
 pnpm viewer
