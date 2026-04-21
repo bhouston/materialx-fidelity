@@ -10,7 +10,7 @@ jobs:
     name: Deploy viewer to Cloud Run
     uses: ./.github/workflows/deploy-service.yml
     with:
-      service_name: materialx-fidelity-viewer
+      service_name: materialx-fidelity
       dockerfile: packages/viewer/Dockerfile
       context: .
     secrets:
