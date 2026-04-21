@@ -19,7 +19,8 @@ afterEach(async () => {
 describe('createReferences', () => {
   it('renders a png named after the adapter beside each material', async () => {
     const root = await makeTempDir('fidelity-');
-    const samplesRoot = path.join(root, 'MaterialX-Samples');
+    const thirdPartyRoot = path.join(root, 'third-party');
+    const samplesRoot = path.join(thirdPartyRoot, 'MaterialX-Samples');
     const adaptersRoot = path.join(root, 'adapters');
     const materialDir = path.join(samplesRoot, 'materials', 'standard_surface', 'default');
     const viewerDir = path.join(samplesRoot, 'viewer');
@@ -58,7 +59,7 @@ export function createAdapter() {
 
     const result = await createReferences({
       adaptersRoot,
-      samplesRoot,
+      thirdPartyRoot,
       adapterName: 'fake',
       concurrency: 2,
       backgroundColor: '0,0,0',
@@ -78,7 +79,8 @@ export function createAdapter() {
 
   it('requires the expected viewer hdr and mesh filenames', async () => {
     const root = await makeTempDir('fidelity-');
-    const samplesRoot = path.join(root, 'MaterialX-Samples');
+    const thirdPartyRoot = path.join(root, 'third-party');
+    const samplesRoot = path.join(thirdPartyRoot, 'MaterialX-Samples');
     const adaptersRoot = path.join(root, 'adapters');
     const materialDir = path.join(samplesRoot, 'materials', 'standard_surface', 'default');
     const viewerDir = path.join(samplesRoot, 'viewer');
@@ -115,7 +117,7 @@ export function createAdapter() {
     await expect(
       createReferences({
         adaptersRoot,
-        samplesRoot,
+        thirdPartyRoot,
         adapterName: 'fake',
         concurrency: 1,
         backgroundColor: '0,0,0',

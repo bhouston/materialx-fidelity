@@ -46,7 +46,7 @@ export async function loadAdapters(options: LoadAdaptersOptions): Promise<Map<st
       throw new Error(`Adapter package at ${adapterDir} must export a named "createAdapter" function.`);
     }
 
-    const adapter = await imported.createAdapter();
+    const adapter = await imported.createAdapter(options.context);
     assertAdapterShape(adapter, adapterDir);
 
     if (adapters.has(adapter.name)) {

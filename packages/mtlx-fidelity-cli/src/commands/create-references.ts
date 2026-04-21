@@ -31,10 +31,10 @@ export const command = defineCommand({
         demandOption: true,
         describe: 'Adapter name to use for rendering.',
       })
-      .option('samples-root', {
+      .option('third-party-root', {
         type: 'string',
-        default: '../MaterialX-Samples',
-        describe: 'Path to the MaterialX-Samples repository root.',
+        default: '../',
+        describe: 'Path containing third-party repositories such as MaterialX-Samples and threejs.',
       })
       .option('adapters-root', {
         type: 'string',
@@ -63,13 +63,13 @@ export const command = defineCommand({
       }),
   handler: async (argv) => {
     const invocationCwd = process.env.INIT_CWD ?? process.cwd();
-    const samplesRoot = path.resolve(invocationCwd, argv['samples-root']);
+    const thirdPartyRoot = path.resolve(invocationCwd, argv['third-party-root']);
     const adaptersRoot = path.resolve(invocationCwd, argv['adapters-root']);
     const startedAt = Date.now();
 
     const result = await createReferences({
       adaptersRoot,
-      samplesRoot,
+      thirdPartyRoot,
       adapterName: argv.adapter,
       concurrency: Math.max(1, argv.concurrency),
       backgroundColor: resolveBackgroundColor(argv['background-color']),

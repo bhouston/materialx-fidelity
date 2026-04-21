@@ -27,8 +27,9 @@ async function runWithConcurrency<T>(items: T[], concurrency: number, worker: (i
 }
 
 export async function createReferences(options: CreateReferencesOptions): Promise<CreateReferencesResult> {
-  const materialsRoot = path.join(options.samplesRoot, 'materials');
-  const viewerRoot = path.join(options.samplesRoot, 'viewer');
+  const samplesRoot = path.join(options.thirdPartyRoot, 'MaterialX-Samples');
+  const materialsRoot = path.join(samplesRoot, 'materials');
+  const viewerRoot = path.join(samplesRoot, 'viewer');
 
   const materialFiles = await findFilesByName(materialsRoot, 'material.mtlx');
   if (materialFiles.length === 0) {
@@ -56,7 +57,12 @@ export async function createReferences(options: CreateReferencesOptions): Promis
     );
   }
 
-  const adapters = await loadAdapters({ adaptersRoot: options.adaptersRoot });
+  const adapters = await loadAdapters({
+    adaptersRoot: options.adaptersRoot,
+    context: {
+      thirdPartyRoot: options.thirdPartyRoot,
+    },
+  });
   const adapter = adapters.get(options.adapterName);
   if (!adapter) {
     const available = [...adapters.keys()].toSorted().join(', ');

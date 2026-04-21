@@ -27,8 +27,8 @@ describe('create-references command', () => {
     try {
       await command.handler({
         adapter: 'materialxview',
-        'samples-root': '../MaterialX-Samples',
-        samplesRoot: '../MaterialX-Samples',
+        'third-party-root': '../',
+        thirdPartyRoot: '../',
         'adapters-root': './adapters',
         adaptersRoot: './adapters',
         'screen-width': 256,
@@ -55,6 +55,7 @@ describe('create-references command', () => {
     expect(firstCall).toBeDefined();
     expect(firstCall?.[0]).toMatchObject({
       adapterName: 'materialxview',
+      thirdPartyRoot: expect.any(String),
       concurrency: 2,
       backgroundColor: '0,0,0',
       screenWidth: 256,
@@ -65,8 +66,8 @@ describe('create-references command', () => {
   it('accepts a normalized rgb background value', async () => {
     await command.handler({
       adapter: 'materialxview',
-      'samples-root': '../MaterialX-Samples',
-      samplesRoot: '../MaterialX-Samples',
+      'third-party-root': '../',
+      thirdPartyRoot: '../',
       'adapters-root': './adapters',
       adaptersRoot: './adapters',
       'screen-width': 256,
@@ -91,8 +92,8 @@ describe('create-references command', () => {
     await expect(
       command.handler({
         adapter: 'materialxview',
-        'samples-root': '../MaterialX-Samples',
-        samplesRoot: '../MaterialX-Samples',
+        'third-party-root': '../',
+        thirdPartyRoot: '../',
         'adapters-root': './adapters',
         adaptersRoot: './adapters',
         'screen-width': 256,
@@ -109,8 +110,8 @@ describe('create-references command', () => {
     await expect(
       command.handler({
         adapter: 'materialxview',
-        'samples-root': '../MaterialX-Samples',
-        samplesRoot: '../MaterialX-Samples',
+        'third-party-root': '../',
+        thirdPartyRoot: '../',
         'adapters-root': './adapters',
         adaptersRoot: './adapters',
         'screen-width': 256,

@@ -1,0 +1,25 @@
+{
+  "name": "@mtlx-fidelity/threejs-adapter",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "source": "./src/index.ts",
+  "files": [
+    "dist",
+    "viewer"
+  ],
+  "dependencies": {
+    "@mtlx-fidelity/core": "workspace:*",
+    "@vitejs/plugin-react": "^6.0.1",
+    "playwright": "^1.59.1",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "vite": "^8.0.9",
+    "zod": "^4.3.6"
+  },
+  "scripts": {
+    "build": "tsgo",
+    "dev": "tsgo -w --preserveWatchOutput"
+  }
+}

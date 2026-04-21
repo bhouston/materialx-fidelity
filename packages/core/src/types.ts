@@ -16,17 +16,22 @@ export interface FidelityAdapter {
   generateImage: (options: GenerateImageOptions) => Promise<void>;
 }
 
+export interface AdapterContext {
+  thirdPartyRoot: string;
+}
+
 export interface AdapterModule {
-  createAdapter: () => Promise<FidelityAdapter> | FidelityAdapter;
+  createAdapter: (context?: AdapterContext) => Promise<FidelityAdapter> | FidelityAdapter;
 }
 
 export interface LoadAdaptersOptions {
   adaptersRoot: string;
+  context?: AdapterContext;
 }
 
 export interface CreateReferencesOptions {
   adaptersRoot: string;
-  samplesRoot: string;
+  thirdPartyRoot: string;
   adapterName: string;
   concurrency: number;
   backgroundColor: string;
