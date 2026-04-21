@@ -25,4 +25,4 @@ RUN pnpm build
 
 EXPOSE 8080
 
-CMD ["node", "/app/packages/viewer/dist/server/server.js"]
+CMD ["pnpm", "--filter", "@materialx-fidelity/viewer", "start"]
