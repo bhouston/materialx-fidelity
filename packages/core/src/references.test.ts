@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { access, mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
@@ -19,6 +19,7 @@ function createSolidPngBase64(red: number, green: number, blue: number, alpha = 
 
 const NON_BLACK_PIXEL_PNG_BASE64 = createSolidPngBase64(255, 0, 0);
 const BLACK_PIXEL_PNG_BASE64 = createSolidPngBase64(0, 0, 0);
+const VALID_MTLX_DOCUMENT = '<materialx version="1.39"></materialx>';
 
 async function makeTempDir(prefix: string): Promise<string> {
   const dir = await mkdtemp(path.join(tmpdir(), prefix));
@@ -52,6 +53,29 @@ function createFailingPrerequisiteRenderer(rendererName = 'fake'): FidelityRende
     async shutdown() {},
     async generateImage() {},
   };
+}
+
+function createTrackingRenderer(base64Png: string, rendererName = 'fake') {
+  const state = {
+    started: false,
+    startCalls: 0,
+  };
+  const renderer: FidelityRenderer = {
+    name: rendererName,
+    version: '0.0.1',
+    async checkPrerequisites() {
+      return { success: true };
+    },
+    async start() {
+      state.started = true;
+      state.startCalls += 1;
+    },
+    async shutdown() {},
+    async generateImage(options) {
+      await writeFile(options.outputPngPath, Buffer.from(base64Png, 'base64'));
+    },
+  };
+  return { renderer, state };
 }
 
 function createAdapterModulePngWriter(base64Png: string, adapterName = 'fake'): string {
@@ -89,7 +113,7 @@ describe('createReferences', () => {
     await mkdir(viewerDir, { recursive: true });
     await mkdir(path.join(adapterDir, 'dist'), { recursive: true });
 
-    await writeFile(path.join(materialDir, 'material.mtlx'), '<material />', 'utf8');
+    await writeFile(path.join(materialDir, 'material.mtlx'), VALID_MTLX_DOCUMENT, 'utf8');
     await writeFile(path.join(viewerDir, 'san_giuseppe_bridge_2k.hdr'), 'hdr', 'utf8');
     await writeFile(path.join(viewerDir, 'ShaderBall.glb'), 'glb', 'utf8');
     await writeFile(
@@ -133,7 +157,7 @@ describe('createReferences', () => {
     await mkdir(viewerDir, { recursive: true });
     await mkdir(path.join(adapterDir, 'dist'), { recursive: true });
 
-    await writeFile(path.join(materialDir, 'material.mtlx'), '<material />', 'utf8');
+    await writeFile(path.join(materialDir, 'material.mtlx'), VALID_MTLX_DOCUMENT, 'utf8');
     await writeFile(path.join(viewerDir, 'other_env.hdr'), 'hdr', 'utf8');
     await writeFile(path.join(viewerDir, 'other_mesh.glb'), 'glb', 'utf8');
     await writeFile(
@@ -182,8 +206,8 @@ export function createAdapter() {
     await mkdir(viewerDir, { recursive: true });
     await mkdir(path.join(adapterDir, 'dist'), { recursive: true });
 
-    await writeFile(path.join(includedDir, 'material.mtlx'), '<material />', 'utf8');
-    await writeFile(path.join(skippedDir, 'material.mtlx'), '<material />', 'utf8');
+    await writeFile(path.join(includedDir, 'material.mtlx'), VALID_MTLX_DOCUMENT, 'utf8');
+    await writeFile(path.join(skippedDir, 'material.mtlx'), VALID_MTLX_DOCUMENT, 'utf8');
     await writeFile(path.join(viewerDir, 'san_giuseppe_bridge_2k.hdr'), 'hdr', 'utf8');
     await writeFile(path.join(viewerDir, 'ShaderBall.glb'), 'glb', 'utf8');
     await writeFile(
@@ -226,8 +250,8 @@ export function createAdapter() {
     await mkdir(viewerDir, { recursive: true });
     await mkdir(path.join(adapterDir, 'dist'), { recursive: true });
 
-    await writeFile(path.join(includedDir, 'material.mtlx'), '<material />', 'utf8');
-    await writeFile(path.join(skippedDir, 'material.mtlx'), '<material />', 'utf8');
+    await writeFile(path.join(includedDir, 'material.mtlx'), VALID_MTLX_DOCUMENT, 'utf8');
+    await writeFile(path.join(skippedDir, 'material.mtlx'), VALID_MTLX_DOCUMENT, 'utf8');
     await writeFile(path.join(viewerDir, 'san_giuseppe_bridge_2k.hdr'), 'hdr', 'utf8');
     await writeFile(path.join(viewerDir, 'ShaderBall.glb'), 'glb', 'utf8');
     await writeFile(
@@ -270,8 +294,8 @@ export function createAdapter() {
     await mkdir(viewerDir, { recursive: true });
     await mkdir(path.join(adapterDir, 'dist'), { recursive: true });
 
-    await writeFile(path.join(materialOneDir, 'material.mtlx'), '<material />', 'utf8');
-    await writeFile(path.join(materialTwoDir, 'material.mtlx'), '<material />', 'utf8');
+    await writeFile(path.join(materialOneDir, 'material.mtlx'), VALID_MTLX_DOCUMENT, 'utf8');
+    await writeFile(path.join(materialTwoDir, 'material.mtlx'), VALID_MTLX_DOCUMENT, 'utf8');
     await writeFile(path.join(viewerDir, 'san_giuseppe_bridge_2k.hdr'), 'hdr', 'utf8');
     await writeFile(path.join(viewerDir, 'ShaderBall.glb'), 'glb', 'utf8');
     await writeFile(
@@ -317,7 +341,7 @@ export function createAdapter() {
     await mkdir(path.join(fakeAdapterDir, 'dist'), { recursive: true });
     await mkdir(path.join(altAdapterDir, 'dist'), { recursive: true });
 
-    await writeFile(path.join(materialDir, 'material.mtlx'), '<material />', 'utf8');
+    await writeFile(path.join(materialDir, 'material.mtlx'), VALID_MTLX_DOCUMENT, 'utf8');
     await writeFile(path.join(viewerDir, 'san_giuseppe_bridge_2k.hdr'), 'hdr', 'utf8');
     await writeFile(path.join(viewerDir, 'ShaderBall.glb'), 'glb', 'utf8');
     await writeFile(
@@ -373,8 +397,8 @@ export function createAdapter() {
     await mkdir(path.join(fakeAdapterDir, 'dist'), { recursive: true });
     await mkdir(path.join(altAdapterDir, 'dist'), { recursive: true });
 
-    await writeFile(path.join(firstMaterialDir, 'material.mtlx'), '<material />', 'utf8');
-    await writeFile(path.join(secondMaterialDir, 'material.mtlx'), '<material />', 'utf8');
+    await writeFile(path.join(firstMaterialDir, 'material.mtlx'), VALID_MTLX_DOCUMENT, 'utf8');
+    await writeFile(path.join(secondMaterialDir, 'material.mtlx'), VALID_MTLX_DOCUMENT, 'utf8');
     await writeFile(path.join(viewerDir, 'san_giuseppe_bridge_2k.hdr'), 'hdr', 'utf8');
     await writeFile(path.join(viewerDir, 'ShaderBall.glb'), 'glb', 'utf8');
     await writeFile(
@@ -436,7 +460,7 @@ export function createAdapter() {
     await mkdir(viewerDir, { recursive: true });
     await mkdir(path.join(adapterDir, 'dist'), { recursive: true });
 
-    await writeFile(path.join(materialDir, 'material.mtlx'), '<material />', 'utf8');
+    await writeFile(path.join(materialDir, 'material.mtlx'), VALID_MTLX_DOCUMENT, 'utf8');
     await writeFile(path.join(viewerDir, 'san_giuseppe_bridge_2k.hdr'), 'hdr', 'utf8');
     await writeFile(path.join(viewerDir, 'ShaderBall.glb'), 'glb', 'utf8');
     await writeFile(
@@ -489,7 +513,7 @@ export function createAdapter() {
     await mkdir(viewerDir, { recursive: true });
     await mkdir(path.join(adapterDir, 'dist'), { recursive: true });
 
-    await writeFile(path.join(materialDir, 'material.mtlx'), '<material />', 'utf8');
+    await writeFile(path.join(materialDir, 'material.mtlx'), VALID_MTLX_DOCUMENT, 'utf8');
     await writeFile(path.join(viewerDir, 'san_giuseppe_bridge_2k.hdr'), 'hdr', 'utf8');
     await writeFile(path.join(viewerDir, 'ShaderBall.glb'), 'glb', 'utf8');
     await writeFile(
@@ -524,5 +548,139 @@ export function createAdapter() {
         concurrency: 1,
       }),
     ).rejects.toThrow('Renderer prerequisites are not met');
+  });
+
+  it('fails before renderer start when material xml is malformed', async () => {
+    const root = await makeTempDir('fidelity-');
+    const thirdPartyRoot = path.join(root, 'third-party');
+    const samplesRoot = path.join(thirdPartyRoot, 'materialx-samples');
+    const materialDir = path.join(samplesRoot, 'materials', 'standard_surface', 'broken');
+    const viewerDir = path.join(samplesRoot, 'viewer');
+    const { renderer, state } = createTrackingRenderer(NON_BLACK_PIXEL_PNG_BASE64, 'fake');
+
+    await mkdir(materialDir, { recursive: true });
+    await mkdir(viewerDir, { recursive: true });
+    await writeFile(path.join(materialDir, 'material.mtlx'), '<materialx version="1.39">', 'utf8');
+    await writeFile(path.join(viewerDir, 'san_giuseppe_bridge_2k.hdr'), 'hdr', 'utf8');
+    await writeFile(path.join(viewerDir, 'ShaderBall.glb'), 'glb', 'utf8');
+
+    await expect(
+      createReferences({
+        thirdPartyRoot,
+        renderers: [renderer],
+        rendererNames: ['fake'],
+        concurrency: 1,
+      }),
+    ).rejects.toThrow('MaterialX pre-render validation failed');
+    expect(state.startCalls).toBe(0);
+    expect(state.started).toBe(false);
+  });
+
+  it('fails before renderer start when unsupported nodes are present', async () => {
+    const root = await makeTempDir('fidelity-');
+    const thirdPartyRoot = path.join(root, 'third-party');
+    const samplesRoot = path.join(thirdPartyRoot, 'materialx-samples');
+    const materialDir = path.join(samplesRoot, 'materials', 'standard_surface', 'unsupported');
+    const viewerDir = path.join(samplesRoot, 'viewer');
+    const { renderer, state } = createTrackingRenderer(NON_BLACK_PIXEL_PNG_BASE64, 'fake');
+
+    await mkdir(materialDir, { recursive: true });
+    await mkdir(viewerDir, { recursive: true });
+    await writeFile(
+      path.join(materialDir, 'material.mtlx'),
+      '<materialx version="1.39"><totally_unknown_node name="mystery" /></materialx>',
+      'utf8',
+    );
+    await writeFile(path.join(viewerDir, 'san_giuseppe_bridge_2k.hdr'), 'hdr', 'utf8');
+    await writeFile(path.join(viewerDir, 'ShaderBall.glb'), 'glb', 'utf8');
+
+    await expect(
+      createReferences({
+        thirdPartyRoot,
+        renderers: [renderer],
+        rendererNames: ['fake'],
+        concurrency: 1,
+      }),
+    ).rejects.toThrow('Unknown node category');
+    expect(state.startCalls).toBe(0);
+    expect(state.started).toBe(false);
+  });
+
+  it('fails before renderer start when a referenced texture file is missing', async () => {
+    const root = await makeTempDir('fidelity-');
+    const thirdPartyRoot = path.join(root, 'third-party');
+    const samplesRoot = path.join(thirdPartyRoot, 'materialx-samples');
+    const materialDir = path.join(samplesRoot, 'materials', 'standard_surface', 'missing-texture');
+    const viewerDir = path.join(samplesRoot, 'viewer');
+    const { renderer, state } = createTrackingRenderer(NON_BLACK_PIXEL_PNG_BASE64, 'fake');
+
+    await mkdir(materialDir, { recursive: true });
+    await mkdir(viewerDir, { recursive: true });
+    await writeFile(
+      path.join(materialDir, 'material.mtlx'),
+      [
+        '<materialx version="1.39">',
+        '  <image name="albedo" type="color3">',
+        '    <input name="file" type="filename" value="textures/albedo.png" />',
+        '  </image>',
+        '</materialx>',
+      ].join('\n'),
+      'utf8',
+    );
+    await writeFile(path.join(viewerDir, 'san_giuseppe_bridge_2k.hdr'), 'hdr', 'utf8');
+    await writeFile(path.join(viewerDir, 'ShaderBall.glb'), 'glb', 'utf8');
+
+    await expect(
+      createReferences({
+        thirdPartyRoot,
+        renderers: [renderer],
+        rendererNames: ['fake'],
+        concurrency: 1,
+      }),
+    ).rejects.toThrow('Missing texture file');
+    expect(state.startCalls).toBe(0);
+    expect(state.started).toBe(false);
+  });
+
+  it('continues rendering and writes warnings for URI texture references', async () => {
+    const root = await makeTempDir('fidelity-');
+    const thirdPartyRoot = path.join(root, 'third-party');
+    const samplesRoot = path.join(thirdPartyRoot, 'materialx-samples');
+    const materialDir = path.join(samplesRoot, 'materials', 'standard_surface', 'uri-texture');
+    const viewerDir = path.join(samplesRoot, 'viewer');
+    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+
+    await mkdir(materialDir, { recursive: true });
+    await mkdir(viewerDir, { recursive: true });
+    await writeFile(
+      path.join(materialDir, 'material.mtlx'),
+      [
+        '<materialx version="1.39">',
+        '  <image name="albedo" type="color3">',
+        '    <input name="file" type="filename" value="https://example.com/albedo.png" />',
+        '  </image>',
+        '</materialx>',
+      ].join('\n'),
+      'utf8',
+    );
+    await writeFile(path.join(viewerDir, 'san_giuseppe_bridge_2k.hdr'), 'hdr', 'utf8');
+    await writeFile(path.join(viewerDir, 'ShaderBall.glb'), 'glb', 'utf8');
+
+    try {
+      const result = await createReferences({
+        thirdPartyRoot,
+        renderers: [createPngWriterRenderer(NON_BLACK_PIXEL_PNG_BASE64, 'fake')],
+        rendererNames: ['fake'],
+        concurrency: 1,
+      });
+
+      expect(result.rendered).toBe(1);
+      expect(result.failures).toHaveLength(0);
+      expect(stderrSpy).toHaveBeenCalled();
+      const warningOutput = stderrSpy.mock.calls.map((call) => String(call[0])).join('\n');
+      expect(warningOutput).toContain('Skipping texture existence check for URI');
+    } finally {
+      stderrSpy.mockRestore();
+    }
   });
 });

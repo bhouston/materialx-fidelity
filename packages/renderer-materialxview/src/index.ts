@@ -104,7 +104,7 @@ class MaterialXViewRenderer implements FidelityRenderer {
       '--envRad',
       options.environmentHdrPath,
       '--drawEnvironment',
-      'false',
+      'true',
       '--screenColor',
       options.backgroundColor,
       '--screenWidth',

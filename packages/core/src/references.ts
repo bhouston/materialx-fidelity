@@ -1,14 +1,29 @@
 import path from 'node:path';
 import { access, mkdir, readFile, rm } from 'node:fs/promises';
+import { readMaterialX, validateDocument } from '@materialx-js/materialx';
 import pLimit from 'p-limit';
 import { PNG } from 'pngjs';
 import sharp from 'sharp';
 import { findFilesByName } from './fs-utils.js';
 import type { CreateReferencesOptions, CreateReferencesResult, FidelityRenderer, RenderFailure } from './types.js';
+import type { MaterialXDocument, MaterialXInput, MaterialXNode } from '@materialx-js/materialx';
 
 const VIEWER_HDR_FILENAME = 'san_giuseppe_bridge_2k.hdr';
 const VIEWER_MODEL_FILENAME = 'ShaderBall.glb';
 const DEFAULT_BACKGROUND_COLOR = '0,0,0';
+const UNKNOWN_NODE_CATEGORY_PREFIX = 'Unknown node category "';
+
+interface PreflightIssue {
+  materialPath: string;
+  level: 'error' | 'warning';
+  location: string;
+  message: string;
+}
+
+interface PreflightResult {
+  fatalIssues: PreflightIssue[];
+  warningIssues: PreflightIssue[];
+}
 
 async function assertRenderIsNotEmpty(outputPngPath: string): Promise<void> {
   const pngBytes = await readFile(outputPngPath);
@@ -34,6 +49,157 @@ function createOutputPath(materialPath: string, rendererName: string): string {
 function toWebpPath(outputPngPath: string): string {
   const parsedPath = path.parse(outputPngPath);
   return path.join(parsedPath.dir, `${parsedPath.name}.webp`);
+}
+
+function normalizeFilePrefix(filePrefix: string | undefined): string {
+  if (!filePrefix) {
+    return '';
+  }
+  return filePrefix.trim();
+}
+
+function hasUriScheme(value: string): boolean {
+  return /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(value);
+}
+
+function combineFilePrefix(parentPrefix: string, childPrefix: string): string {
+  if (!childPrefix) {
+    return parentPrefix;
+  }
+  if (!parentPrefix || path.isAbsolute(childPrefix) || hasUriScheme(childPrefix)) {
+    return childPrefix;
+  }
+  return `${parentPrefix}${childPrefix}`;
+}
+
+function extractFilenameInputValue(input: MaterialXInput): string {
+  const inputValue = input.value ?? input.attributes.value ?? '';
+  return inputValue.trim();
+}
+
+async function validateTextureInputsForNodes(
+  materialPath: string,
+  nodes: MaterialXNode[],
+  scope: string,
+  inheritedFilePrefix: string,
+): Promise<PreflightResult> {
+  const fatalIssues: PreflightIssue[] = [];
+  const warningIssues: PreflightIssue[] = [];
+  const materialDirectory = path.dirname(materialPath);
+
+  for (const node of nodes) {
+    const nodePrefix = combineFilePrefix(inheritedFilePrefix, normalizeFilePrefix(node.attributes.fileprefix));
+    const nodeLocation = `${scope}/${node.category}:${node.name ?? 'unnamed'}`;
+
+    for (const input of node.inputs) {
+      if (input.type !== 'filename') {
+        continue;
+      }
+
+      const filenameValue = extractFilenameInputValue(input);
+      if (filenameValue.length === 0) {
+        continue;
+      }
+      const location = `${nodeLocation}/input:${input.name || 'unnamed'}`;
+      if (hasUriScheme(filenameValue)) {
+        warningIssues.push({
+          materialPath,
+          level: 'warning',
+          location,
+          message: `Skipping texture existence check for URI "${filenameValue}".`,
+        });
+        continue;
+      }
+
+      const inputPrefix = combineFilePrefix(nodePrefix, normalizeFilePrefix(input.attributes.fileprefix));
+      const sourcePath = `${inputPrefix}${filenameValue}`;
+      const resolvedPath = path.isAbsolute(sourcePath) ? sourcePath : path.resolve(materialDirectory, sourcePath);
+
+      try {
+        await access(resolvedPath);
+      } catch {
+        fatalIssues.push({
+          materialPath,
+          level: 'error',
+          location,
+          message: `Missing texture file "${sourcePath}" resolved to "${resolvedPath}".`,
+        });
+      }
+    }
+  }
+
+  return { fatalIssues, warningIssues };
+}
+
+async function preflightMaterialValidation(materialPaths: string[]): Promise<PreflightResult> {
+  const fatalIssues: PreflightIssue[] = [];
+  const warningIssues: PreflightIssue[] = [];
+
+  for (const materialPath of materialPaths) {
+    let document: MaterialXDocument;
+    try {
+      document = await readMaterialX(materialPath);
+    } catch (error) {
+      fatalIssues.push({
+        materialPath,
+        level: 'error',
+        location: 'materialx',
+        message: error instanceof Error ? error.message : String(error),
+      });
+      continue;
+    }
+
+    for (const issue of validateDocument(document)) {
+      const issueRecord: PreflightIssue = {
+        materialPath,
+        level: issue.level,
+        location: issue.location,
+        message: issue.message,
+      };
+      if (issue.level === 'error' || issue.message.startsWith(UNKNOWN_NODE_CATEGORY_PREFIX)) {
+        fatalIssues.push(issueRecord);
+      } else {
+        warningIssues.push(issueRecord);
+      }
+    }
+
+    const documentPrefix = normalizeFilePrefix(document.attributes.fileprefix);
+    const documentTextureIssues = await validateTextureInputsForNodes(
+      materialPath,
+      document.nodes,
+      'materialx',
+      documentPrefix,
+    );
+    fatalIssues.push(...documentTextureIssues.fatalIssues);
+    warningIssues.push(...documentTextureIssues.warningIssues);
+    for (const nodeGraph of document.nodeGraphs) {
+      const nodeGraphPrefix = combineFilePrefix(documentPrefix, normalizeFilePrefix(nodeGraph.attributes.fileprefix));
+      const nodeGraphScope = `materialx/nodegraph:${nodeGraph.name ?? 'unnamed'}`;
+      const nodeGraphTextureIssues = await validateTextureInputsForNodes(
+        materialPath,
+        nodeGraph.nodes,
+        nodeGraphScope,
+        nodeGraphPrefix,
+      );
+      fatalIssues.push(...nodeGraphTextureIssues.fatalIssues);
+      warningIssues.push(...nodeGraphTextureIssues.warningIssues);
+    }
+  }
+
+  return { fatalIssues, warningIssues };
+}
+
+function writeValidationWarnings(warnings: PreflightIssue[]): void {
+  for (const warning of warnings) {
+    process.stderr.write(`WARN ${warning.materialPath} | ${warning.location}: ${warning.message}\n`);
+  }
+}
+
+function formatFatalValidationIssues(issues: PreflightIssue[]): string {
+  return [
+    `MaterialX pre-render validation failed for ${new Set(issues.map((issue) => issue.materialPath)).size} material(s):`,
+    ...issues.map((issue) => `- ${issue.materialPath} | ${issue.location}: ${issue.message}`),
+  ].join('\n');
 }
 
 function parseMaterialSelectorAsRegex(selector: string): RegExp | undefined {
@@ -177,6 +343,13 @@ export async function createReferences(options: CreateReferencesOptions): Promis
   if (failedRendererChecks.length > 0) {
     throw new Error(`Renderer prerequisites are not met:\n- ${failedRendererChecks.join('\n- ')}`);
   }
+  const preflightResult = await preflightMaterialValidation(selectedMaterialFiles);
+  if (preflightResult.warningIssues.length > 0) {
+    writeValidationWarnings(preflightResult.warningIssues);
+  }
+  if (preflightResult.fatalIssues.length > 0) {
+    throw new Error(formatFatalValidationIssues(preflightResult.fatalIssues));
+  }
 
   const failures: RenderFailure[] = [];
   let started = 0;
@@ -188,6 +361,8 @@ export async function createReferences(options: CreateReferencesOptions): Promis
     selectedRenderers.map((renderer) => ({ materialPath, renderer })),
   );
   const startedRenderers: FidelityRenderer[] = [];
+  let renderPipelineError: Error | undefined;
+  let shutdownError: Error | undefined;
   try {
     for (const renderer of selectedRenderers) {
       await renderer.start();
@@ -253,8 +428,9 @@ export async function createReferences(options: CreateReferencesOptions): Promis
         }),
       ),
     );
+  } catch (error) {
+    renderPipelineError = error instanceof Error ? error : new Error(String(error));
   } finally {
-    let shutdownError: Error | undefined;
     for (const renderer of startedRenderers.toReversed()) {
       try {
         await renderer.shutdown();
@@ -262,9 +438,12 @@ export async function createReferences(options: CreateReferencesOptions): Promis
         shutdownError ??= error instanceof Error ? error : new Error(String(error));
       }
     }
-    if (shutdownError) {
-      throw shutdownError;
-    }
+  }
+  if (shutdownError) {
+    throw shutdownError;
+  }
+  if (renderPipelineError) {
+    throw renderPipelineError;
   }
 
   return {

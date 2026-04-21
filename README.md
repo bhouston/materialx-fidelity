@@ -69,10 +69,10 @@ To keep reference renders visually comparable between `materialxview` and `three
 
 - camera: perspective, FOV `45`, near `0.05`, eye `(0,0,5)`, look target `(0,0,0)`
 - model normalization: center the loaded `ShaderBall.glb` at the origin, then scale it so the bounding-box sphere radius is `2.0` (matching `MaterialXView`'s `IDEAL_MESH_SPHERE_RADIUS`)
-- lighting for capture: IBL from `san_giuseppe_bridge_2k.hdr`, environment background disabled, direct light disabled, shadow map disabled
+- lighting for capture: IBL from `san_giuseppe_bridge_2k.hdr`, environment background enabled, direct light disabled, shadow map disabled
 - environment orientation parity: apply a Y rotation offset of `-90` degrees in the Three.js viewer (`scene.environmentRotation.y`) to match MaterialXView lighting orientation
 - color/output: no tone mapping, sRGB output encoding
-- fixed black background (`0,0,0`)
+- visible background comes from the active environment HDR (`san_giuseppe_bridge_2k.hdr`)
 - fixed resolution of `1024x1024`
 
 These values are intentionally aligned with `MaterialXView` defaults and its scene normalization behavior in `source/MaterialXView/Viewer.cpp`.

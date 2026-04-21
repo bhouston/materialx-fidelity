@@ -137,6 +137,7 @@ Yes. It already is a glTF binary (`shaderball.glb`). For Three.js parity:
 - Use precomputed irradiance map from `resources/Lights/irradiance/san_giuseppe_bridge_split.hdr` for diffuse IBL contribution (if your MaterialX shader path expects separate irradiance input).
 - Add one directional light with values from `san_giuseppe_bridge_split.mtlx`.
 - Apply shared Y rotation to env and directional light.
+- Use the environment HDR as both `scene.environment` and `scene.background` when matching refractive/transmissive background behavior.
 - Use no tone mapping (`NoToneMapping`) if matching viewer behavior.
 - Use sRGB output conversion only (renderer output color space set to sRGB).
 - Keep camera near/far and FOV close to viewer defaults (near `0.05`, far large enough, FOV around `45`).

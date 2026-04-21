@@ -19,6 +19,8 @@ Core flags for thumbnail generation:
 - `--captureFilename` output image path
 - Optional quality/look controls: `--envSampleCount`, `--lightRotation`, `--envLightIntensity`, `--cameraZoom`, `--shadowMap`, `--drawEnvironment`
 
+For this repository's reference renderer parity profile, `--drawEnvironment` is enabled so the HDR is used for both lighting and visible background.
+
 ## Build and run
 
 From repository root:

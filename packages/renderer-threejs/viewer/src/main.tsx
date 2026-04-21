@@ -128,9 +128,12 @@ async function buildScene(): Promise<void> {
   const hdrLoader = new HDRLoader();
   const environmentTexture = await hdrLoader.loadAsync(query.environmentHdrPath);
   environmentTexture.mapping = THREE.EquirectangularReflectionMapping;
+  const environmentRotationRadians = THREE.MathUtils.degToRad(query.environmentRotationDegrees);
   scene.environment = environmentTexture;
-  scene.environmentRotation.set(0, THREE.MathUtils.degToRad(query.environmentRotationDegrees), 0);
-  scene.background = null;
+  scene.environmentRotation.set(0, environmentRotationRadians, 0);
+  scene.background = environmentTexture;
+  const sceneWithBackgroundRotation = scene as THREE.Scene & { backgroundRotation?: THREE.Euler };
+  sceneWithBackgroundRotation.backgroundRotation?.set(0, environmentRotationRadians, 0);
 
   const gltfLoader = new GLTFLoader();
   const gltf = await gltfLoader.loadAsync(query.modelPath);
