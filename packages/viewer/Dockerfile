@@ -21,7 +21,7 @@ RUN test -d /app/third_party/materialx-samples/materials
 
 RUN pnpm install --frozen-lockfile --prefer-offline
 
-RUN pnpm --filter @materialx-fidelity/viewer build
+RUN pnpm build
 
 EXPOSE 8080
 
