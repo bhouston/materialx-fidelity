@@ -67,7 +67,7 @@ function toMaterialZipUrl(materialType: string, materialName: string): string {
 
 function toLiveViewerUrl(materialType: string, materialName: string): string {
   const materialUrl = toMaterialZipUrl(materialType, materialName)
-  return `${HOMAGE_VIEWER_BASE_URL}/?material=${encodeURIComponent(materialUrl)}`
+  return `${HOMAGE_VIEWER_BASE_URL}/?sourceUrl=${encodeURIComponent(materialUrl)}`
 }
 
 function inferRepoRoot(invocationCwd: string): string {
