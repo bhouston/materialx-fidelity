@@ -19,10 +19,10 @@ const colorSpaceLib = {
 };
 
 function getOutputChannel( outputName ) {
-	if ( outputName === 'outx' ) return 0;
-	if ( outputName === 'outy' ) return 1;
-	if ( outputName === 'outz' ) return 2;
-	if ( outputName === 'outw' ) return 3;
+	if ( outputName === 'outx' || outputName === 'outr' || outputName === 'r' ) return 0;
+	if ( outputName === 'outy' || outputName === 'outg' || outputName === 'g' ) return 1;
+	if ( outputName === 'outz' || outputName === 'outb' || outputName === 'b' ) return 2;
+	if ( outputName === 'outw' || outputName === 'outa' || outputName === 'a' ) return 3;
 	return 0;
 }
 
@@ -187,8 +187,11 @@ class MaterialXNode {
 			} else if ( elementName === 'tiledimage' ) {
 				const file = this.getChildByName( 'file' );
 				const textureFile = file.getTexture();
-				const uvTiling = mx_transform_uv( ...this.getNodesByNames( 'uvtiling', 'uvoffset' ) );
-				node = texture( textureFile, uvTiling );
+				const uvNode = this.getNodeByName( 'texcoord' ) || uv( 0 );
+				const uvTiling = this.getNodeByName( 'uvtiling' );
+				const uvOffset = this.getNodeByName( 'uvoffset' );
+				const transformedUv = mx_transform_uv( uvNode, uvTiling, uvOffset );
+				node = texture( textureFile, transformedUv );
 
 				const colorSpaceNode = file.getColorSpaceNode();
 				if ( colorSpaceNode ) node = colorSpaceNode( node );

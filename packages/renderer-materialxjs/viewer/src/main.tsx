@@ -100,6 +100,8 @@ function createBrowserTextureResolver(mtlxPathUrl: string): TextureResolver {
       texture.name = resolvedUrl;
       texture.wrapS = RepeatWrapping;
       texture.wrapT = RepeatWrapping;
+      // Match MaterialXView/Three vendor MaterialX orientation semantics.
+      texture.flipY = false;
       cache.set(resolvedUrl, texture);
       return texture;
     },

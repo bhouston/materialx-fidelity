@@ -164,30 +164,33 @@ function applyOpenPbrSurface( material, inputs, issueCollector, nodeName ) {
 	material.specularIntensityNode = inputs.specular_weight || float( 1 );
 	material.specularColorNode = inputs.specular_color || color( 1, 1, 1 );
 	material.iorNode = inputs.specular_ior || inputs.specular_ior_level || float( 1.5 );
+	setAnisotropy( material, inputs.specular_roughness_anisotropy, float( 0 ) );
 
 	material.clearcoatNode = inputs.coat_weight || float( 0 );
 	material.clearcoatRoughnessNode = inputs.coat_roughness || float( 0 );
 	if ( hasNodeValue( inputs.geometry_coat_normal ) ) material.clearcoatNormalNode = inputs.geometry_coat_normal;
 
-	material.sheenNode = inputs.fuzz_weight || float( 0 );
-	material.sheenColorNode = inputs.fuzz_color || color( 1, 1, 1 );
+	const fuzzWeight = inputs.fuzz_weight || float( 0 );
+	const fuzzColor = inputs.fuzz_color || color( 1, 1, 1 );
+	material.sheenNode = mul( fuzzWeight, fuzzColor );
 	material.sheenRoughnessNode = inputs.fuzz_roughness || float( 0.5 );
 
 	material.transmissionNode = inputs.transmission_weight || float( 0 );
-	material.transmissionColorNode = inputs.transmission_color || color( 1, 1, 1 );
+	material.attenuationColorNode = inputs.transmission_color || color( 1, 1, 1 );
 	const transmissionDepthNode = inputs.transmission_depth || float( 0 );
 	material.thicknessNode = hasNodeValue( inputs.geometry_thin_walled ) ? inputs.geometry_thin_walled.select( float( 0 ), transmissionDepthNode ) : transmissionDepthNode;
+	material.attenuationDistanceNode = transmissionDepthNode;
 
 	const transmissionDispersionAbbe = inputs.transmission_dispersion_abbe_number || float( 20 );
 	if ( hasNodeValue( inputs.transmission_dispersion_scale ) ) {
-		material.dispersionNode = inputs.transmission_dispersion_scale.div( transmissionDispersionAbbe );
+		material.dispersionNode = inputs.transmission_dispersion_scale.mul( float( 20 ) ).div( transmissionDispersionAbbe );
 	}
 
 	material.opacityNode = inputs.geometry_opacity || float( 1 );
 	if ( hasNodeValue( inputs.geometry_normal ) ) material.normalNode = inputs.geometry_normal;
 
 	material.iridescenceNode = inputs.thin_film_weight || float( 0 );
-	material.iridescenceThicknessNode = inputs.thin_film_thickness || float( 0.5 );
+	material.iridescenceThicknessNode = ( inputs.thin_film_thickness || float( 0.5 ) ).mul( float( 1000 ) );
 	material.iridescenceIORNode = inputs.thin_film_ior || float( 1.4 );
 
 	const emissionColor = inputs.emission_color;

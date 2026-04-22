@@ -6,7 +6,7 @@ import {
 	mx_fractal_noise_float, mx_noise_float, mx_cell_noise_float, mx_worley_noise_float,
 	mx_unifiednoise2d, mx_unifiednoise3d, mx_place2d, mx_safepower, mx_contrast, element,
 	reflect, refract, mx_timer, mx_frame, mx_ifgreater, mx_ifgreatereq, mx_ifequal, mx_atan2, positionLocal,
-	mx_rotate2d, mx_rotate3d, mx_heighttonormal, float, int, bool, color, vec2, vec3, vec4, checker, fract, sub
+	mx_rotate2d, mx_rotate3d, mx_heighttonormal, float, int, bool, color, vec2, vec3, vec4, checker, fract, sub, step
 } from 'three/tsl';
 
 class MXElement {
@@ -123,6 +123,45 @@ const mx_dodge = ( fg, bg, mixval = 1 ) => {
 	return mx_dodge_channel( fg, bg, mixval );
 };
 
+const mx_ramp4 = ( valuetl, valuetr, valuebl, valuebr, texcoord = vec2( 0, 0 ) ) => {
+	const clamped = clamp( texcoord, vec2( 0, 0 ), vec2( 1, 1 ) );
+	const s = element( clamped, 0 );
+	const t = element( clamped, 1 );
+	const topMix = mix( valuetl, valuetr, s );
+	const bottomMix = mix( valuebl, valuebr, s );
+	return mix( bottomMix, topMix, t );
+};
+
+const mx_ramp_gradient = ( x = 0, interval1 = 0, interval2 = 1, color1 = vec4( 0, 0, 0, 1 ), color2 = vec4( 1, 1, 1, 1 ), interpolation = 1, prevColor = vec4( 0, 0, 0, 1 ), intervalNum = 1, numIntervals = 2 ) => {
+	const xFloat = float( x );
+	const interval1Float = float( interval1 );
+	const interval2Float = float( interval2 );
+	const interpolationFloat = float( interpolation );
+	const intervalNumFloat = float( intervalNum );
+	const numIntervalsFloat = float( numIntervals );
+	const mixColor4 = ( bg, fg, factor ) => vec4(
+		mix( element( bg, 0 ), element( fg, 0 ), factor ),
+		mix( element( bg, 1 ), element( fg, 1 ), factor ),
+		mix( element( bg, 2 ), element( fg, 2 ), factor ),
+		mix( element( bg, 3 ), element( fg, 3 ), factor )
+	);
+	const linearClamped = clamp( xFloat, interval1Float, interval2Float );
+	const rangeSize = sub( interval2Float, interval1Float );
+	const safeRange = max( rangeSize, float( 1e-6 ) );
+	const linearRemap = div( sub( linearClamped, interval1Float ), safeRange );
+	const smoothVal = smoothstep( interval1Float, interval2Float, xFloat );
+	const interpolationDistanceToLinear = abs( sub( interpolationFloat, float( 0 ) ) );
+	const useLinear = sub( float( 1 ), step( float( 0.5 ), interpolationDistanceToLinear ) );
+	const interpFactor = mix( smoothVal, linearRemap, useLinear );
+	const mixedColor = mixColor4( color1, color2, interpFactor );
+	const stepColor = mixColor4( color1, color2, step( interval2Float, xFloat ) );
+	const interpolationDistanceToStep = abs( sub( interpolationFloat, float( 2 ) ) );
+	const useStep = sub( float( 1 ), step( float( 0.5 ), interpolationDistanceToStep ) );
+	const interpolated = mixColor4( mixedColor, stepColor, useStep );
+	const withinInterval = mixColor4( prevColor, interpolated, step( add( interval1Float, float( 1e-6 ) ), xFloat ) );
+	return mixColor4( withinInterval, prevColor, step( numIntervalsFloat, intervalNumFloat ) );
+};
+
 const defaultFloat = ( value ) => () => float( value );
 const defaultInt = ( value ) => () => int( value );
 const defaultBool = ( value ) => () => bool( value );
@@ -218,6 +257,24 @@ const MXElements = [
 	new MXElement( 'combine4', vec4, [ 'in1', 'in2', 'in3', 'in4' ], { in1: defaultFloat( 0 ), in2: defaultFloat( 0 ), in3: defaultFloat( 0 ), in4: defaultFloat( 0 ) } ),
 	new MXElement( 'ramplr', mx_ramplr, [ 'valuel', 'valuer', 'texcoord' ], { valuel: defaultFloat( 0 ), valuer: defaultFloat( 0 ) } ),
 	new MXElement( 'ramptb', mx_ramptb, [ 'valuet', 'valueb', 'texcoord' ], { valuet: defaultFloat( 0 ), valueb: defaultFloat( 0 ) } ),
+	new MXElement( 'ramp4', mx_ramp4, [ 'valuetl', 'valuetr', 'valuebl', 'valuebr', 'texcoord' ], {
+		valuetl: defaultColor( 0, 0, 0 ),
+		valuetr: defaultColor( 0, 0, 0 ),
+		valuebl: defaultColor( 0, 0, 0 ),
+		valuebr: defaultColor( 0, 0, 0 ),
+		texcoord: defaultVec2( 0, 0 )
+	} ),
+	new MXElement( 'ramp_gradient', mx_ramp_gradient, [ 'x', 'interval1', 'interval2', 'color1', 'color2', 'interpolation', 'prev_color', 'interval_num', 'num_intervals' ], {
+		x: defaultFloat( 0 ),
+		interval1: defaultFloat( 0 ),
+		interval2: defaultFloat( 1 ),
+		color1: defaultVec4( 0, 0, 0, 1 ),
+		color2: defaultVec4( 1, 1, 1, 1 ),
+		interpolation: defaultFloat( 1 ),
+		prev_color: defaultVec4( 0, 0, 0, 1 ),
+		interval_num: defaultFloat( 1 ),
+		num_intervals: defaultFloat( 2 )
+	} ),
 	new MXElement( 'splitlr', mx_splitlr, [ 'valuel', 'valuer', 'center', 'texcoord' ], {
 		valuel: defaultFloat( 0 ),
 		valuer: defaultFloat( 0 ),
