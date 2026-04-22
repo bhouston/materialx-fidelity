@@ -138,7 +138,7 @@ export async function createReferences(options: CreateReferencesOptions): Promis
   const selectedMaterialFiles =
     materialSelectors.length > 0
       ? materialFiles.filter((materialPath) =>
-          materialSelectors.some((selector) => materialMatchesSelector(materialPath, materialsRoot, selector)),
+          materialSelectors.some((selector) => materialMatchesSelector(materialPath, selector)),
         )
       : materialFiles;
   if (selectedMaterialFiles.length === 0) {

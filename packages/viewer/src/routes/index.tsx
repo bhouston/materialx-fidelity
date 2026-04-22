@@ -456,10 +456,7 @@ function App() {
                           );
                         })}
                         {groupIndex < data.rendererGroups.length - 1 ? (
-                          <div
-                            aria-hidden="true"
-                            className="my-1 w-px self-stretch bg-border"
-                          />
+                          <div aria-hidden="true" className="my-1 w-px self-stretch bg-border" />
                         ) : null}
                       </div>
                     ))}
@@ -540,7 +537,10 @@ function App() {
                       <h4 className="font-semibold text-foreground">Validation issues</h4>
                       <ul className="space-y-2">
                         {(activeReportData.validationIssues ?? activeReportData.issues ?? []).map((issue, index) => (
-                          <li key={`${issue.location ?? 'issue'}-${index}`} className="rounded-md border border-border px-3 py-2">
+                          <li
+                            key={`${issue.location ?? 'issue'}-${index}`}
+                            className="rounded-md border border-border px-3 py-2"
+                          >
                             <p className="font-medium text-foreground">
                               {issue.level ?? 'issue'} {issue.location ? `- ${issue.location}` : ''}
                             </p>
@@ -556,7 +556,10 @@ function App() {
                     {activeReportData.logs && activeReportData.logs.length > 0 ? (
                       <ul className="space-y-2">
                         {activeReportData.logs.map((entry, index) => (
-                          <li key={`${entry.message ?? 'log'}-${index}`} className="rounded-md border border-border px-3 py-2">
+                          <li
+                            key={`${entry.message ?? 'log'}-${index}`}
+                            className="rounded-md border border-border px-3 py-2"
+                          >
                             <p className="font-medium text-foreground">
                               {(entry.level ?? 'log').toUpperCase()}
                               {entry.source ? ` - ${entry.source}` : ''}

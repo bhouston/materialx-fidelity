@@ -129,7 +129,12 @@ export async function validateMaterial(materialPath: string): Promise<PreflightR
   }
 
   const documentPrefix = normalizeFilePrefix(document.attributes.fileprefix);
-  const documentTextureIssues = await validateTextureInputsForNodes(materialPath, document.nodes, 'materialx', documentPrefix);
+  const documentTextureIssues = await validateTextureInputsForNodes(
+    materialPath,
+    document.nodes,
+    'materialx',
+    documentPrefix,
+  );
   fatalIssues.push(...documentTextureIssues.fatalIssues);
   warningIssues.push(...documentTextureIssues.warningIssues);
   for (const nodeGraph of document.nodeGraphs) {
@@ -155,9 +160,10 @@ export function writeValidationWarnings(warnings: PreflightIssue[]): void {
 }
 
 export function formatFatalValidationIssues(materialPath: string, issues: PreflightIssue[]): string {
-  return [`MaterialX validation failed for ${materialPath}:`, ...issues.map((issue) => `- ${issue.location}: ${issue.message}`)].join(
-    '\n',
-  );
+  return [
+    `MaterialX validation failed for ${materialPath}:`,
+    ...issues.map((issue) => `- ${issue.location}: ${issue.message}`),
+  ].join('\n');
 }
 
 function createFailureJsonPath(materialPath: string, rendererName: string): string {

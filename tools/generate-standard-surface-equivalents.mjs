@@ -2,14 +2,13 @@
 
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import process from 'node:process';
 
 const MATERIAL_NAMES = `
 absval acos add and artistic_ior asin atan2 blackbody bump burn ceil cellnoise2d cellnoise3d checkerboard circle clamp colorcorrect combine2 combine3 combine4 constant contrast convert cos creatematrix crossproduct determinant difference distance divide dodge dot dotproduct exp extract floor fract fractal3d frame heighttonormal hextiledimage hextilednormalmap hsvtorgb ifequal ifgreater ifgreatereq image invert invertmatrix ln luminance magnitude max min minus mix modulo multiply noise2d noise3d normal normalize normalmap not or overlay place2d position power ramp ramp_gradient ramp4 ramplr ramptb range reflect refract remap rgbtohsv rotate2d rotate3d round safepower saturate screen separate2 separate3 separate4 sign sin smoothstep splitlr splittb sqrt subtract tan tangent texcoord tiledimage time transformmatrix transformnormal transformpoint transformvector transpose unifiednoise2d unifiednoise3d unpremult viewdirection worleynoise2d worleynoise3d xor
 `
   .trim()
   .split(/\s+/)
-  .sort((a, b) => a.localeCompare(b));
+  .toSorted((a, b) => a.localeCompare(b));
 
 const STRICT_NEUTRAL_INPUTS = new Map([
   ['occlusion', '1'],
@@ -91,9 +90,9 @@ function isNeutralValue(value, neutral) {
 function hasConnection(attributes) {
   return Boolean(
     attributes.get('nodename') ||
-      attributes.get('nodegraph') ||
-      attributes.get('interfacename') ||
-      attributes.get('defaultinput'),
+    attributes.get('nodegraph') ||
+    attributes.get('interfacename') ||
+    attributes.get('defaultinput'),
   );
 }
 

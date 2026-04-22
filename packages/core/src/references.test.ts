@@ -275,7 +275,7 @@ export function createAdapter() {
     await expect(access(path.join(skippedDir, 'fake.webp'))).rejects.toThrow('ENOENT');
   });
 
-  it('supports regex material selectors', async () => {
+  it('supports regex material selectors against material directory names', async () => {
     const root = await makeTempDir('fidelity-');
     const thirdPartyRoot = path.join(root, 'third-party');
     const samplesRoot = path.join(thirdPartyRoot, 'materialx-samples');
@@ -309,13 +309,44 @@ export function createAdapter() {
       renderers: [createPngWriterRenderer(NON_BLACK_PIXEL_PNG_BASE64, 'fake')],
       rendererNames: ['fake'],
       concurrency: 2,
-      materialSelectors: ['/gltf_pbr/i'],
+      materialSelectors: ['/inclu/i'],
     });
 
     expect(result.total).toBe(1);
     expect(result.attempted).toBe(1);
     expect(result.rendered).toBe(1);
     await expect(access(path.join(includedDir, 'fake.webp'))).resolves.toBeUndefined();
+    await expect(access(path.join(skippedDir, 'fake.webp'))).rejects.toThrow('ENOENT');
+  });
+
+  it('does not match material selectors against parent directories', async () => {
+    const root = await makeTempDir('fidelity-');
+    const thirdPartyRoot = path.join(root, 'third-party');
+    const samplesRoot = path.join(thirdPartyRoot, 'materialx-samples');
+    const viewerDir = path.join(samplesRoot, 'viewer');
+    const includedDir = path.join(samplesRoot, 'materials', 'gltf_pbr', 'included');
+    const skippedDir = path.join(samplesRoot, 'materials', 'standard_surface', 'skipped');
+
+    await mkdir(includedDir, { recursive: true });
+    await mkdir(skippedDir, { recursive: true });
+    await mkdir(viewerDir, { recursive: true });
+
+    await writeFile(path.join(includedDir, 'material.mtlx'), VALID_MTLX_DOCUMENT, 'utf8');
+    await writeFile(path.join(skippedDir, 'material.mtlx'), VALID_MTLX_DOCUMENT, 'utf8');
+    await writeFile(path.join(viewerDir, 'san_giuseppe_bridge_2k.hdr'), 'hdr', 'utf8');
+    await writeFile(path.join(viewerDir, 'ShaderBall.glb'), 'glb', 'utf8');
+
+    await expect(
+      createReferences({
+        thirdPartyRoot,
+        renderers: [createPngWriterRenderer(NON_BLACK_PIXEL_PNG_BASE64, 'fake')],
+        rendererNames: ['fake'],
+        concurrency: 2,
+        materialSelectors: ['gltf_pbr'],
+      }),
+    ).rejects.toThrow('No material.mtlx files matched --materials "gltf_pbr".');
+
+    await expect(access(path.join(includedDir, 'fake.webp'))).rejects.toThrow('ENOENT');
     await expect(access(path.join(skippedDir, 'fake.webp'))).rejects.toThrow('ENOENT');
   });
 

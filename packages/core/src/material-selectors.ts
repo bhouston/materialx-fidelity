@@ -23,14 +23,11 @@ function parseMaterialSelectorAsRegex(selector: string): RegExp | undefined {
   return undefined;
 }
 
-export function materialMatchesSelector(materialPath: string, materialsRoot: string, selector: string): boolean {
+export function materialMatchesSelector(materialPath: string, selector: string): boolean {
   const regex = parseMaterialSelectorAsRegex(selector);
   const materialDirectory = path.dirname(materialPath);
-  const relativeMaterialPath = path.relative(materialsRoot, materialPath);
-  const relativeMaterialDirectory = path.relative(materialsRoot, materialDirectory);
-  const matchTargets = [materialPath, materialDirectory, relativeMaterialPath, relativeMaterialDirectory].map((target) =>
-    target.replaceAll('\\', '/'),
-  );
+  const materialDirectoryLeafName = path.basename(materialDirectory);
+  const matchTargets = [materialDirectoryLeafName];
 
   if (regex) {
     return matchTargets.some((target) => {

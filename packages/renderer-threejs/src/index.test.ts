@@ -4,9 +4,11 @@ import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { createRenderer } from './index.js';
 
+type AsyncUnknownFn = (...args: unknown[]) => Promise<unknown>;
+
 const { createServerMock, launchMock } = vi.hoisted(() => ({
-  createServerMock: vi.fn(),
-  launchMock: vi.fn(),
+  createServerMock: vi.fn<AsyncUnknownFn>(),
+  launchMock: vi.fn<AsyncUnknownFn>(),
 }));
 
 vi.mock('vite', () => ({
@@ -54,39 +56,43 @@ describe('threejs renderer', () => {
     await createFile(path.join(viewerRoot, 'ShaderBall.glb'));
 
     const server = {
-      listen: vi.fn(async () => undefined),
-      close: vi.fn(async () => undefined),
+      listen: vi.fn<() => Promise<void>>(async () => undefined),
+      close: vi.fn<() => Promise<void>>(async () => undefined),
       resolvedUrls: { local: ['http://127.0.0.1:4173/'], network: [] },
     };
     createServerMock.mockResolvedValue(server);
 
     const firstPage = {
-      setViewportSize: vi.fn(async () => undefined),
-      goto: vi.fn(async () => undefined),
-      waitForFunction: vi.fn(async () => undefined),
-      evaluate: vi.fn(async () => undefined),
-      screenshot: vi.fn(async () => undefined),
-      close: vi.fn(async () => undefined),
+      setViewportSize: vi.fn<() => Promise<void>>(async () => undefined),
+      goto: vi.fn<() => Promise<void>>(async () => undefined),
+      waitForFunction: vi.fn<() => Promise<void>>(async () => undefined),
+      evaluate: vi.fn<() => Promise<void>>(async () => undefined),
+      screenshot: vi.fn<() => Promise<void>>(async () => undefined),
+      close: vi.fn<() => Promise<void>>(async () => undefined),
     };
     const secondPage = {
-      setViewportSize: vi.fn(async () => undefined),
-      goto: vi.fn(async () => undefined),
-      waitForFunction: vi.fn(async () => undefined),
-      evaluate: vi.fn(async () => undefined),
-      screenshot: vi.fn(async () => undefined),
-      close: vi.fn(async () => undefined),
+      setViewportSize: vi.fn<() => Promise<void>>(async () => undefined),
+      goto: vi.fn<() => Promise<void>>(async () => undefined),
+      waitForFunction: vi.fn<() => Promise<void>>(async () => undefined),
+      evaluate: vi.fn<() => Promise<void>>(async () => undefined),
+      screenshot: vi.fn<() => Promise<void>>(async () => undefined),
+      close: vi.fn<() => Promise<void>>(async () => undefined),
     };
 
+    let pageCallCount = 0;
     const browserContext = {
-      newPage: vi.fn().mockResolvedValueOnce(firstPage).mockResolvedValueOnce(secondPage),
-      close: vi.fn(async () => undefined),
+      newPage: vi.fn<() => Promise<typeof firstPage>>(async () => {
+        pageCallCount += 1;
+        return pageCallCount === 1 ? firstPage : secondPage;
+      }),
+      close: vi.fn<() => Promise<void>>(async () => undefined),
     };
     const probeBrowser = {
-      close: vi.fn(async () => undefined),
+      close: vi.fn<() => Promise<void>>(async () => undefined),
     };
     const browser = {
-      newContext: vi.fn(async () => browserContext),
-      close: vi.fn(async () => undefined),
+      newContext: vi.fn<() => Promise<typeof browserContext>>(async () => browserContext),
+      close: vi.fn<() => Promise<void>>(async () => undefined),
     };
     launchMock.mockResolvedValueOnce(probeBrowser).mockResolvedValueOnce(browser);
 

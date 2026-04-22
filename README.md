@@ -61,7 +61,7 @@ Currently supported renderers:
 Optional flags:
 
 - `--renderers <name[,name...]>` optional renderer filter; supports repeated flags and comma-separated values
-- `--materials <selector[,selector...]>` optional material filter; supports repeated flags, comma-separated values, substring matches, and regex selectors (`re:...` or `/.../flags`)
+- `--materials <selector[,selector...]>` optional material filter; matches against each material directory name only (leaf directory), supports repeated flags, comma-separated values, substring matches, and regex selectors (`re:...` or `/.../flags`)
 - `--concurrency <number>` default `1`
 
 ## Node Isolation Suite
@@ -106,8 +106,8 @@ pnpm cli create-references --materials node_isolation
 ```
 
 ```bash
-# targeted node subset by regex
-pnpm cli create-references --materials "re:gltf_pbr/node_isolation/(image|tiledimage|transformmatrix)$"
+# targeted node subset by regex on leaf directory names
+pnpm cli create-references --materials "re:(image|tiledimage|transformmatrix)$"
 ```
 
 ## Reference Renderer Setup

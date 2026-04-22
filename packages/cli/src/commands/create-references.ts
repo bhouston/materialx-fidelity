@@ -281,7 +281,7 @@ export const command = defineCommand({
       .option('materials', {
         type: 'array',
         describe:
-          'Material selectors. Supports repeated values, comma-separated values, or regex (`re:...` or `/.../flags`).',
+          'Material selectors matched against material directory names. Supports repeated values, comma-separated values, or regex (`re:...` or `/.../flags`).',
       })
       .option('filter', {
         type: 'string',
