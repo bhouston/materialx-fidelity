@@ -116,6 +116,15 @@ function getOutputChannel(outputName) {
   return 0;
 }
 
+function normalizeSpaceName(value, fallback = 'world') {
+  if (typeof value !== 'string') return fallback;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === '') return fallback;
+  if (normalized === 'world') return 'world';
+  if (normalized === 'object' || normalized === 'model') return 'object';
+  return fallback;
+}
+
 class MaterialXNode {
   constructor(materialX, nodeXML, nodePath = '') {
     this.materialX = materialX;
@@ -306,13 +315,16 @@ class MaterialXNode {
       } else if (elementName === 'constant') {
         node = this.getNodeByName('value');
       } else if (elementName === 'position') {
-        const space = this.getAttribute('space');
+        const rawSpace = this.getInputValueByName('space') ?? this.getAttribute('space');
+        const space = normalizeSpaceName(rawSpace, 'world');
         node = space === 'world' ? positionWorld : positionLocal;
       } else if (elementName === 'normal') {
-        const space = this.getAttribute('space');
+        const rawSpace = this.getInputValueByName('space') ?? this.getAttribute('space');
+        const space = normalizeSpaceName(rawSpace, 'world');
         node = space === 'world' ? normalWorld : normalLocal;
       } else if (elementName === 'tangent') {
-        const space = this.getAttribute('space');
+        const rawSpace = this.getInputValueByName('space') ?? this.getAttribute('space');
+        const space = normalizeSpaceName(rawSpace, 'world');
         node = space === 'world' ? tangentWorld : tangentLocal;
       } else if (elementName === 'texcoord') {
         const indexNode = this.getChildByName('index');
@@ -430,6 +442,11 @@ class MaterialXNode {
   getNodeByName(name) {
     const child = this.getChildByName(name);
     return child ? child.getNode(child.output) : undefined;
+  }
+
+  getInputValueByName(name) {
+    const child = this.getChildByName(name);
+    return child ? child.value : null;
   }
 
   getNodesByNames(...names) {

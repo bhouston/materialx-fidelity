@@ -102,6 +102,15 @@ const mx_ifgreatereq_materialx = (value1, value2, in1, in2) => mx_ifgreatereq(va
 const mx_ifequal_materialx = (value1, value2, in1, in2) => mx_ifequal(value1, value2, in2, in1);
 const mx_checkerboard = (color1, color2, texcoord) => mix(color1, color2, clamp(checker(texcoord), 0, 1));
 
+// Match MaterialX smoothstep semantics for degenerate ranges:
+// when high <= low, behave like step(high, in) instead of relying on GPU undefined behavior.
+const mx_smoothstep_materialx = (inNode, low = 0, high = 1) => {
+  const hermite = smoothstep(low, high, inNode);
+  const fallback = step(high, inNode);
+  const useFallback = step(high, low);
+  return mix(hermite, fallback, useFallback);
+};
+
 const mx_circle = (texcoord, center, radius) => {
   const delta = sub(texcoord, center);
   const distanceSquared = dot(delta, delta);
@@ -404,7 +413,7 @@ const MXElements = [
     outhigh: defaultFloat(1),
     gamma: defaultFloat(1),
   }),
-  new MXElement('smoothstep', smoothstep, ['in', 'low', 'high'], {
+  new MXElement('smoothstep', mx_smoothstep_materialx, ['in', 'low', 'high'], {
     in: defaultFloat(0),
     low: defaultFloat(0),
     high: defaultFloat(1),

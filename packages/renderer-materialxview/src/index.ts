@@ -8,6 +8,7 @@ import {
   type FidelityRenderer,
   type GenerateImageOptions,
   type GenerateImageResult,
+  type RenderLogEntry,
   type RendererPrerequisiteCheckResult,
 } from '@materialx-fidelity/core';
 
@@ -35,27 +36,58 @@ function resolveExecutable(): string {
   return match;
 }
 
-function execute(executable: string, args: string[]): Promise<void> {
+function createRenderError(message: string, logs: RenderLogEntry[]): Error & { rendererLogs: RenderLogEntry[] } {
+  const error = new Error(message) as Error & { rendererLogs: RenderLogEntry[] };
+  error.rendererLogs = logs;
+  return error;
+}
+
+function execute(executable: string, args: string[]): Promise<RenderLogEntry[]> {
   return new Promise((resolve, reject) => {
     const processHandle = spawn(executable, args, { stdio: ['ignore', 'pipe', 'pipe'] });
-    let stderr = '';
+    const logs: RenderLogEntry[] = [];
+    let stdoutBuffer = '';
+    let stderrBuffer = '';
 
+    const flushBufferedLines = (buffer: string, level: RenderLogEntry['level']): string => {
+      const lines = buffer.split(/\r?\n/);
+      const remainder = lines.pop() ?? '';
+      for (const line of lines) {
+        const message = line.trim();
+        if (!message) {
+          continue;
+        }
+        logs.push({ level, source: 'renderer', message });
+      }
+      return remainder;
+    };
+
+    processHandle.stdout.on('data', (chunk) => {
+      stdoutBuffer += chunk.toString();
+      stdoutBuffer = flushBufferedLines(stdoutBuffer, 'info');
+    });
     processHandle.stderr.on('data', (chunk) => {
-      stderr += chunk.toString();
+      stderrBuffer += chunk.toString();
+      stderrBuffer = flushBufferedLines(stderrBuffer, 'warning');
     });
 
     processHandle.on('error', (error) => {
-      reject(error);
+      reject(createRenderError(error.message, logs));
     });
 
     processHandle.on('close', (code) => {
+      stdoutBuffer = flushBufferedLines(`${stdoutBuffer}\n`, 'info');
+      stderrBuffer = flushBufferedLines(`${stderrBuffer}\n`, 'warning');
+
       if (code === 0) {
-        resolve();
+        resolve(logs);
         return;
       }
 
-      const message = stderr.trim() || `Process exited with code ${String(code)}.`;
-      reject(new Error(message));
+      const message =
+        logs.at(-1)?.message ||
+        `materialxview exited with code ${String(code)}${code === null ? ' (terminated by signal)' : ''}.`;
+      reject(createRenderError(message, logs));
     });
   });
 }
@@ -129,8 +161,8 @@ class MaterialXViewRenderer implements FidelityRenderer {
       args.push('--path', additionalSearchPath);
     }
 
-    await execute(this.executable, args);
-    return { logs: [] };
+    const logs = await execute(this.executable, args);
+    return { logs };
   }
 }
 

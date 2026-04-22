@@ -195,6 +195,7 @@ function applyStandardSurface(material, inputs, issueCollector, nodeName) {
 
 function applyGltfPbrSurface(material, inputs, issueCollector, nodeName) {
   const opacityNode = buildGltfOpacityNode(inputs.alpha, inputs.alpha_mode, inputs.alpha_cutoff);
+  const hasAttenuationColorInput = Object.prototype.hasOwnProperty.call(inputs, 'attenuation_color');
 
   material.colorNode = inputs.base_color || color(1, 1, 1);
   if (hasNodeValue(inputs.occlusion)) material.aoNode = inputs.occlusion;
@@ -213,9 +214,8 @@ function applyGltfPbrSurface(material, inputs, issueCollector, nodeName) {
   material.iridescenceNode = inputs.iridescence || float(0);
   material.iridescenceIORNode = inputs.iridescence_ior || float(1.3);
   material.iridescenceThicknessNode = inputs.iridescence_thickness || float(100);
-  const hasAttenuationColorInput = hasNodeValue(inputs.attenuation_color);
   material.attenuationDistanceNode = toAttenuationDistance(inputs.attenuation_distance, hasAttenuationColorInput);
-  material.attenuationColorNode = inputs.attenuation_color;
+  material.attenuationColorNode = inputs.attenuation_color || color(1, 1, 1);
   if (hasNodeValue(inputs.thickness)) {
     material.thicknessNode = inputs.thickness;
   } else if (hasNodeValue(inputs.transmission)) {

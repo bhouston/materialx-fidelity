@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { createServerFn } from '@tanstack/react-start';
 import { ExternalLink, DownloadIcon, Info, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useGoogleAnalytics } from 'tanstack-router-ga4';
 import { getViewerIndexData } from '#/lib/material-index';
 
@@ -102,6 +102,8 @@ function App() {
   const [activeReportData, setActiveReportData] = useState<RenderReport | null>(null);
   const [activeReportError, setActiveReportError] = useState<string | null>(null);
   const [isReportLoading, setIsReportLoading] = useState(false);
+  const hasMaterialFilterChangedRef = useRef(false);
+  const lastTrackedMaterialFilterRef = useRef(search.materials?.trim() ?? '');
   const filteredGroups = data.groups
     .filter((group) => selectedSurfaceSet.has(group.type as SurfaceType))
     .map((group) => ({
@@ -155,6 +157,32 @@ function App() {
   }, [activeReport]);
 
   useEffect(() => {
+    if (!hasMaterialFilterChangedRef.current) {
+      return;
+    }
+
+    const normalizedFilter = search.materials?.trim() ?? '';
+    if (normalizedFilter === lastTrackedMaterialFilterRef.current) {
+      hasMaterialFilterChangedRef.current = false;
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      ga.event('material_filter', {
+        material_filter_value: normalizedFilter,
+        material_filter_length: normalizedFilter.length,
+        material_filter_is_empty: normalizedFilter.length === 0,
+      });
+      lastTrackedMaterialFilterRef.current = normalizedFilter;
+      hasMaterialFilterChangedRef.current = false;
+    }, 5000);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [ga, search.materials]);
+
+  useEffect(() => {
     if (!activeReport) {
       return;
     }
@@ -205,6 +233,7 @@ function App() {
   };
 
   const handleMaterialSearchChange = (value: string) => {
+    hasMaterialFilterChangedRef.current = true;
     const trimmed = value.trim();
     updateFilters({
       materials: trimmed.length > 0 ? value : undefined,
@@ -217,6 +246,16 @@ function App() {
       ? [...new Set([...selectedSurfaces, surfaceType])]
       : selectedSurfaces.filter((value) => value !== surfaceType);
     const normalizedSelected = nextSelected.length > 0 ? nextSelected : [...SURFACE_TYPES];
+    const resultingEnabled = normalizedSelected.includes(surfaceType);
+
+    ga.event('surface_filter_toggled', {
+      surface_type: surfaceType,
+      surface_enabled: resultingEnabled,
+      requested_state: checked,
+      selection_reset_to_all: nextSelected.length === 0,
+      selected_surface_count: normalizedSelected.length,
+      selected_surfaces: normalizedSelected.join(','),
+    });
 
     updateFilters({
       materials: search.materials,
