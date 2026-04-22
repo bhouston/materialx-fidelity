@@ -36,6 +36,7 @@ export interface MaterialViewModel {
   liveViewerUrl: string;
   downloadMtlxZipUrl: string;
   images: Record<string, string | null>;
+  reports: Record<string, string | null>;
 }
 
 export interface MaterialTypeGroupViewModel {
@@ -132,6 +133,18 @@ async function resolveReferenceImageCandidatePath(
   const pngPath = path.join(materialDirectory, `${rendererName}.png`);
   if (await directoryExists(pngPath)) {
     return pngPath;
+  }
+
+  return undefined;
+}
+
+async function resolveReferenceReportCandidatePath(
+  materialDirectory: string,
+  rendererName: string,
+): Promise<string | undefined> {
+  const reportPath = path.join(materialDirectory, `${rendererName}.json`);
+  if (await directoryExists(reportPath)) {
+    return reportPath;
   }
 
   return undefined;
@@ -264,6 +277,17 @@ export async function getViewerIndexData(): Promise<ViewerIndexViewModel> {
         }),
       ),
     );
+    const reports = Object.fromEntries(
+      await Promise.all(
+        renderers.map(async (rendererName) => {
+          const reportPath = await resolveReferenceReportCandidatePath(descriptor.absoluteDirectory, rendererName);
+          const reportUrl = reportPath
+            ? `/api/reference-report/${encodeURIComponent(descriptor.type)}/${encodeURIComponent(descriptor.name)}/${encodeURIComponent(rendererName)}`
+            : null;
+          return [rendererName, reportUrl] as const;
+        }),
+      ),
+    );
 
     const material: MaterialViewModel = {
       type: descriptor.type,
@@ -272,6 +296,7 @@ export async function getViewerIndexData(): Promise<ViewerIndexViewModel> {
       liveViewerUrl: toLiveViewerUrl(descriptor.type, descriptor.name),
       downloadMtlxZipUrl: toMaterialZipUrl(descriptor.type, descriptor.name),
       images,
+      reports,
     };
     const group = grouped.get(descriptor.type) ?? [];
     group.push(material);
@@ -305,6 +330,19 @@ export async function resolveReferenceImagePath(
   }
 
   return resolveReferenceImageCandidatePath(targetDirectory, adapterName);
+}
+
+export async function resolveReferenceReportPath(
+  materialType: string,
+  materialName: string,
+  adapterName: string,
+): Promise<string | undefined> {
+  const targetDirectory = await resolveMaterialDirectory(materialType, materialName);
+  if (!targetDirectory) {
+    return undefined;
+  }
+
+  return resolveReferenceReportCandidatePath(targetDirectory, adapterName);
 }
 
 export async function resolveMaterialDirectory(

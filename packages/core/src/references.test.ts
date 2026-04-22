@@ -769,4 +769,89 @@ export function createAdapter() {
       stderrSpy.mockRestore();
     }
   });
+
+  it('filters debug logs from successful render reports', async () => {
+    const root = await makeTempDir('fidelity-');
+    const thirdPartyRoot = path.join(root, 'third-party');
+    const samplesRoot = path.join(thirdPartyRoot, 'materialx-samples');
+    const materialDir = path.join(samplesRoot, 'materials', 'standard_surface', 'log-filter-success');
+    const viewerDir = path.join(samplesRoot, 'viewer');
+    const renderer = createPngWriterRenderer(NON_BLACK_PIXEL_PNG_BASE64, 'fake');
+    renderer.generateImage = async (options) => {
+      await writeFile(options.outputPngPath, Buffer.from(NON_BLACK_PIXEL_PNG_BASE64, 'base64'));
+      return {
+        logs: [
+          { level: 'debug', source: 'browser', message: '[vite] connecting...' },
+          {
+            level: 'info',
+            source: 'browser',
+            message: 'Download the React DevTools for a better development experience',
+          },
+          { level: 'info', source: 'renderer', message: 'render started' },
+          { level: 'warning', source: 'renderer', message: 'minor warning' },
+        ],
+      };
+    };
+
+    await mkdir(materialDir, { recursive: true });
+    await mkdir(viewerDir, { recursive: true });
+    await writeFile(path.join(materialDir, 'material.mtlx'), VALID_MTLX_DOCUMENT, 'utf8');
+    await writeFile(path.join(viewerDir, 'san_giuseppe_bridge_2k.hdr'), 'hdr', 'utf8');
+    await writeFile(path.join(viewerDir, 'ShaderBall.glb'), 'glb', 'utf8');
+
+    await createReferences({
+      thirdPartyRoot,
+      renderers: [renderer],
+      rendererNames: ['fake'],
+      concurrency: 1,
+    });
+
+    const report = JSON.parse(await readFile(path.join(materialDir, 'fake.json'), 'utf8')) as {
+      logs: Array<{ level: string; message: string }>;
+    };
+    expect(report.logs).toEqual([
+      { level: 'info', source: 'renderer', message: 'render started' },
+      { level: 'warning', source: 'renderer', message: 'minor warning' },
+    ]);
+  });
+
+  it('filters debug logs from renderer errors', async () => {
+    const root = await makeTempDir('fidelity-');
+    const thirdPartyRoot = path.join(root, 'third-party');
+    const samplesRoot = path.join(thirdPartyRoot, 'materialx-samples');
+    const materialDir = path.join(samplesRoot, 'materials', 'standard_surface', 'log-filter-failure');
+    const viewerDir = path.join(samplesRoot, 'viewer');
+    const renderer = createPngWriterRenderer(NON_BLACK_PIXEL_PNG_BASE64, 'fake');
+    renderer.generateImage = async () => {
+      const error = new Error('Renderer failed');
+      (error as Error & { rendererLogs?: unknown }).rendererLogs = [
+        { level: 'debug', source: 'browser', message: '[vite] connected.' },
+        { level: 'error', source: 'renderer', message: 'shader compile failed' },
+      ];
+      throw error;
+    };
+
+    await mkdir(materialDir, { recursive: true });
+    await mkdir(viewerDir, { recursive: true });
+    await writeFile(path.join(materialDir, 'material.mtlx'), VALID_MTLX_DOCUMENT, 'utf8');
+    await writeFile(path.join(viewerDir, 'san_giuseppe_bridge_2k.hdr'), 'hdr', 'utf8');
+    await writeFile(path.join(viewerDir, 'ShaderBall.glb'), 'glb', 'utf8');
+
+    const result = await createReferences({
+      thirdPartyRoot,
+      renderers: [renderer],
+      rendererNames: ['fake'],
+      concurrency: 1,
+    });
+
+    expect(result.failures).toHaveLength(1);
+    expect(result.failures[0]?.logs).toEqual([
+      { level: 'error', source: 'renderer', message: 'shader compile failed' },
+    ]);
+
+    const report = JSON.parse(await readFile(path.join(materialDir, 'fake.json'), 'utf8')) as {
+      logs: Array<{ level: string; source: string; message: string }>;
+    };
+    expect(report.logs).toEqual([{ level: 'error', source: 'renderer', message: 'shader compile failed' }]);
+  });
 });

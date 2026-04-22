@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiAssetSplatRouteImport } from './routes/api/asset/$'
+import { Route as ApiReferenceReportMaterialTypeMaterialNameAdapterRouteImport } from './routes/api/reference-report/$materialType/$materialName/$adapter'
 import { Route as ApiReferenceImageMaterialTypeMaterialNameAdapterRouteImport } from './routes/api/reference-image/$materialType/$materialName/$adapter'
 
 const IndexRoute = IndexRouteImport.update({
@@ -23,6 +24,12 @@ const ApiAssetSplatRoute = ApiAssetSplatRouteImport.update({
   path: '/api/asset/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiReferenceReportMaterialTypeMaterialNameAdapterRoute =
+  ApiReferenceReportMaterialTypeMaterialNameAdapterRouteImport.update({
+    id: '/api/reference-report/$materialType/$materialName/$adapter',
+    path: '/api/reference-report/$materialType/$materialName/$adapter',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiReferenceImageMaterialTypeMaterialNameAdapterRoute =
   ApiReferenceImageMaterialTypeMaterialNameAdapterRouteImport.update({
     id: '/api/reference-image/$materialType/$materialName/$adapter',
@@ -34,17 +41,20 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/asset/$': typeof ApiAssetSplatRoute
   '/api/reference-image/$materialType/$materialName/$adapter': typeof ApiReferenceImageMaterialTypeMaterialNameAdapterRoute
+  '/api/reference-report/$materialType/$materialName/$adapter': typeof ApiReferenceReportMaterialTypeMaterialNameAdapterRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/asset/$': typeof ApiAssetSplatRoute
   '/api/reference-image/$materialType/$materialName/$adapter': typeof ApiReferenceImageMaterialTypeMaterialNameAdapterRoute
+  '/api/reference-report/$materialType/$materialName/$adapter': typeof ApiReferenceReportMaterialTypeMaterialNameAdapterRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/api/asset/$': typeof ApiAssetSplatRoute
   '/api/reference-image/$materialType/$materialName/$adapter': typeof ApiReferenceImageMaterialTypeMaterialNameAdapterRoute
+  '/api/reference-report/$materialType/$materialName/$adapter': typeof ApiReferenceReportMaterialTypeMaterialNameAdapterRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -52,22 +62,26 @@ export interface FileRouteTypes {
     | '/'
     | '/api/asset/$'
     | '/api/reference-image/$materialType/$materialName/$adapter'
+    | '/api/reference-report/$materialType/$materialName/$adapter'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/api/asset/$'
     | '/api/reference-image/$materialType/$materialName/$adapter'
+    | '/api/reference-report/$materialType/$materialName/$adapter'
   id:
     | '__root__'
     | '/'
     | '/api/asset/$'
     | '/api/reference-image/$materialType/$materialName/$adapter'
+    | '/api/reference-report/$materialType/$materialName/$adapter'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiAssetSplatRoute: typeof ApiAssetSplatRoute
   ApiReferenceImageMaterialTypeMaterialNameAdapterRoute: typeof ApiReferenceImageMaterialTypeMaterialNameAdapterRoute
+  ApiReferenceReportMaterialTypeMaterialNameAdapterRoute: typeof ApiReferenceReportMaterialTypeMaterialNameAdapterRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -86,6 +100,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAssetSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/reference-report/$materialType/$materialName/$adapter': {
+      id: '/api/reference-report/$materialType/$materialName/$adapter'
+      path: '/api/reference-report/$materialType/$materialName/$adapter'
+      fullPath: '/api/reference-report/$materialType/$materialName/$adapter'
+      preLoaderRoute: typeof ApiReferenceReportMaterialTypeMaterialNameAdapterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/reference-image/$materialType/$materialName/$adapter': {
       id: '/api/reference-image/$materialType/$materialName/$adapter'
       path: '/api/reference-image/$materialType/$materialName/$adapter'
@@ -101,6 +122,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAssetSplatRoute: ApiAssetSplatRoute,
   ApiReferenceImageMaterialTypeMaterialNameAdapterRoute:
     ApiReferenceImageMaterialTypeMaterialNameAdapterRoute,
+  ApiReferenceReportMaterialTypeMaterialNameAdapterRoute:
+    ApiReferenceReportMaterialTypeMaterialNameAdapterRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

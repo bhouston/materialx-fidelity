@@ -51,6 +51,16 @@ interface RenderResultReportOptions {
   logs?: RenderLogEntry[];
 }
 
+const NOISY_LOG_MESSAGE_SUBSTRINGS = ['Download the React DevTools for a better development experience'];
+
+function isNoisyLogMessage(message: string): boolean {
+  return NOISY_LOG_MESSAGE_SUBSTRINGS.some((substring) => message.includes(substring));
+}
+
+function filterReportableLogs(logs: RenderLogEntry[]): RenderLogEntry[] {
+  return logs.filter((entry) => entry.level !== 'debug' && !isNoisyLogMessage(entry.message));
+}
+
 function readRendererLogs(value: unknown): RenderLogEntry[] {
   if (!value || typeof value !== 'object') {
     return [];
@@ -59,14 +69,20 @@ function readRendererLogs(value: unknown): RenderLogEntry[] {
   if (!Array.isArray(candidate.rendererLogs)) {
     return [];
   }
-  return candidate.rendererLogs.filter(
-    (entry): entry is RenderLogEntry =>
-      typeof entry === 'object' &&
-      entry !== null &&
-      typeof (entry as { level?: unknown }).level === 'string' &&
-      typeof (entry as { source?: unknown }).source === 'string' &&
-      typeof (entry as { message?: unknown }).message === 'string',
+  return filterReportableLogs(
+    candidate.rendererLogs.filter(
+      (entry): entry is RenderLogEntry =>
+        typeof entry === 'object' &&
+        entry !== null &&
+        typeof (entry as { level?: unknown }).level === 'string' &&
+        typeof (entry as { source?: unknown }).source === 'string' &&
+        typeof (entry as { message?: unknown }).message === 'string',
+    ),
   );
+}
+
+function normalizeRenderLogs(logs: RenderLogEntry[]): RenderLogEntry[] {
+  return filterReportableLogs(logs);
 }
 
 async function writeRenderResultReport(options: RenderResultReportOptions): Promise<void> {
@@ -278,13 +294,13 @@ export async function createReferences(options: CreateReferencesOptions): Promis
               modelPath,
               backgroundColor: DEFAULT_BACKGROUND_COLOR,
             });
-            logs = [...renderResult.logs];
+            logs = normalizeRenderLogs([...renderResult.logs]);
             await assertRenderIsNotEmpty(outputPngPath, renderer.emptyReferenceImagePath);
             await sharp(outputPngPath).webp({ quality: 99 }).toFile(outputWebpPath);
             await rm(outputPngPath, { force: true });
           } catch (error) {
             renderError = error instanceof Error ? error : new Error(String(error));
-            logs = [...logs, ...readRendererLogs(error)];
+            logs = normalizeRenderLogs([...logs, ...readRendererLogs(error)]);
           }
 
           if (renderError) {

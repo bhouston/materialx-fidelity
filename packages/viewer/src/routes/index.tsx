@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { createServerFn } from '@tanstack/react-start';
-import { ExternalLink, DownloadIcon } from 'lucide-react';
+import { ExternalLink, DownloadIcon, Info, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useGoogleAnalytics } from 'tanstack-router-ga4';
 import { getViewerIndexData } from '#/lib/material-index';
 
@@ -56,6 +57,54 @@ function toAnchorId(value: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
+interface ReportLogEntry {
+  level?: string;
+  source?: string;
+  message?: string;
+}
+
+interface ReportIssue {
+  level?: string;
+  location?: string;
+  message?: string;
+}
+
+interface ReportError {
+  name?: string;
+  message?: string;
+  stack?: string;
+}
+
+interface RenderReport {
+  rendererName?: string;
+  materialPath?: string;
+  status?: string;
+  success?: boolean;
+  startedAt?: string;
+  completedAt?: string;
+  durationMs?: number;
+  error?: ReportError | null;
+  validationIssues?: ReportIssue[];
+  issues?: ReportIssue[];
+  logs?: ReportLogEntry[];
+}
+
+interface ActiveReportState {
+  materialName: string;
+  rendererName: string;
+  reportUrl: string;
+}
+
+function formatDuration(durationMs: number | undefined): string | undefined {
+  if (typeof durationMs !== 'number' || Number.isNaN(durationMs) || durationMs < 0) {
+    return undefined;
+  }
+  if (durationMs < 1000) {
+    return `${durationMs} ms`;
+  }
+  return `${(durationMs / 1000).toFixed(2)} s`;
+}
+
 function App() {
   const data = Route.useLoaderData();
   const search = Route.useSearch();
@@ -64,6 +113,10 @@ function App() {
   const selectedSurfaces = toSelectedSurfaceTypes(search.surfaces);
   const selectedSurfaceSet = new Set(selectedSurfaces);
   const materialSearch = search.materials?.trim().toLocaleLowerCase() ?? '';
+  const [activeReport, setActiveReport] = useState<ActiveReportState | null>(null);
+  const [activeReportData, setActiveReportData] = useState<RenderReport | null>(null);
+  const [activeReportError, setActiveReportError] = useState<string | null>(null);
+  const [isReportLoading, setIsReportLoading] = useState(false);
   const filteredGroups = data.groups
     .filter((group) => selectedSurfaceSet.has(group.type as SurfaceType))
     .map((group) => ({
@@ -71,8 +124,65 @@ function App() {
       materials: group.materials.filter((material) => material.name.toLocaleLowerCase().includes(materialSearch)),
     }))
     .filter((group) => group.materials.length > 0);
+  const filteredMaterials = filteredGroups.flatMap((group) =>
+    group.materials.map((material) => ({
+      ...material,
+      type: group.type,
+    })),
+  );
   const shownMaterialCount = filteredGroups.reduce((total, group) => total + group.materials.length, 0);
   const totalMaterialCount = data.groups.reduce((total, group) => total + group.materials.length, 0);
+
+  useEffect(() => {
+    if (!activeReport) {
+      return;
+    }
+
+    const abortController = new AbortController();
+    const fetchReport = async () => {
+      setIsReportLoading(true);
+      setActiveReportData(null);
+      setActiveReportError(null);
+      try {
+        const response = await fetch(activeReport.reportUrl, { signal: abortController.signal });
+        if (!response.ok) {
+          throw new Error(`Failed to load report (${response.status})`);
+        }
+        const json = (await response.json()) as RenderReport;
+        setActiveReportData(json);
+      } catch (error) {
+        if (abortController.signal.aborted) {
+          return;
+        }
+        setActiveReportError(error instanceof Error ? error.message : String(error));
+      } finally {
+        if (!abortController.signal.aborted) {
+          setIsReportLoading(false);
+        }
+      }
+    };
+
+    void fetchReport();
+
+    return () => {
+      abortController.abort();
+    };
+  }, [activeReport]);
+
+  useEffect(() => {
+    if (!activeReport) {
+      return;
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setActiveReport(null);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [activeReport]);
 
   const trackMaterialAction = (
     action: 'download_mtlx' | 'open_live_viewer' | 'open_source',
@@ -275,105 +385,229 @@ function App() {
 
       <div className="border-t border-border" />
 
-      {filteredGroups.map((group) => {
-        const groupId = toAnchorId(group.type);
-        return (
-          <section key={group.type} className="pt-2">
-            <h2 id={groupId} className="group flex items-center gap-2 text-xl font-semibold capitalize text-foreground">
-              <span>{group.type}</span>
-              <a
-                aria-label={`Link to ${group.type}`}
-                className="text-sm text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
-                href={`#${groupId}`}
+      <section className="pt-2">
+        <div className="border-t border-border">
+          {filteredMaterials.map((material) => {
+            const materialId = toAnchorId(`${material.type}-${material.name}`);
+            return (
+              <article
+                key={`${material.type}/${material.name}`}
+                className="border-b border-border py-4 last:border-b-0"
               >
-                #
-              </a>
-            </h2>
+                <div className="group flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <h3 id={materialId} className="flex items-center gap-2 text-base font-semibold text-foreground">
+                    <span>
+                      {material.type} / {material.name}
+                    </span>
+                    <a
+                      aria-label={`Link to ${material.type} / ${material.name}`}
+                      className="text-sm text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
+                      href={`#${materialId}`}
+                    >
+                      #
+                    </a>
+                  </h3>
+                  <div className="ml-auto flex flex-wrap items-center justify-end gap-2 text-sm">
+                    <a
+                      className="inline-flex items-center gap-1 rounded-none border border-border bg-muted/40 px-2.5 py-1.5 font-normal text-foreground transition-colors hover:border-primary/40 hover:bg-muted/60"
+                      download
+                      href={material.downloadMtlxZipUrl}
+                      onClick={() => trackMaterialAction('download_mtlx', material)}
+                    >
+                      <DownloadIcon className="size-3.5" />
+                      <span>Download</span>
+                    </a>
+                    <a
+                      className="inline-flex items-center gap-1 rounded-none border border-border bg-muted/40 px-2.5 py-1.5 font-normal text-foreground transition-colors hover:border-primary/40 hover:bg-muted/60"
+                      href={material.liveViewerUrl}
+                      onClick={() => trackMaterialAction('open_live_viewer', material)}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      <ExternalLink aria-hidden="true" className="size-3.5" /> <span>Viewer</span>
+                    </a>
+                  </div>
+                </div>
 
-            <div className="mt-3 border-t border-border">
-              {group.materials.map((material) => {
-                const materialId = `${groupId}-${toAnchorId(material.name)}`;
-                return (
-                  <article
-                    key={`${material.type}/${material.name}`}
-                    className="border-b border-border py-4 last:border-b-0"
-                  >
-                    <div className="group flex flex-wrap items-center gap-x-3 gap-y-1">
-                      <h3 id={materialId} className="flex items-center gap-2 text-base font-semibold text-foreground">
-                        <span>{material.name}</span>
-                        <a
-                          aria-label={`Link to ${material.name}`}
-                          className="text-sm text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
-                          href={`#${materialId}`}
-                        >
-                          #
-                        </a>
-                      </h3>
-                      <div className="ml-auto flex flex-wrap items-center justify-end gap-2 text-sm">
-                        <a
-                          className="inline-flex items-center gap-1 rounded-none border border-border bg-muted/40 px-2.5 py-1.5 font-normal text-foreground transition-colors hover:border-primary/40 hover:bg-muted/60"
-                          download
-                          href={material.downloadMtlxZipUrl}
-                          onClick={() => trackMaterialAction('download_mtlx', material)}
-                        >
-                          <DownloadIcon className="size-3.5" />
-                          <span>Download</span>
-                        </a>
-                        <a
-                          className="inline-flex items-center gap-1 rounded-none border border-border bg-muted/40 px-2.5 py-1.5 font-normal text-foreground transition-colors hover:border-primary/40 hover:bg-muted/60"
-                          href={material.liveViewerUrl}
-                          onClick={() => trackMaterialAction('open_live_viewer', material)}
-                          rel="noreferrer"
-                          target="_blank"
-                        >
-                          <ExternalLink aria-hidden="true" className="size-3.5" /> <span>Viewer</span>
-                        </a>
+                <div className="mt-3 overflow-x-auto pb-2">
+                  <div className="flex min-w-full justify-center gap-4">
+                    {data.rendererGroups.map((rendererGroup, groupIndex) => (
+                      <div key={rendererGroup.category} className="flex flex-none items-stretch gap-4">
+                        {rendererGroup.renderers.map((rendererName) => {
+                          const imageUrl = material.images[rendererName];
+                          const reportUrl = material.reports[rendererName];
+                          return (
+                            <figure key={rendererName} className="flex w-[170px] flex-none flex-col gap-2 sm:w-[200px]">
+                              <div className="relative">
+                                {imageUrl ? (
+                                  <img
+                                    alt={`${material.name} rendered by ${rendererName}`}
+                                    className="aspect-square w-full border border-border object-cover"
+                                    loading="lazy"
+                                    src={imageUrl}
+                                  />
+                                ) : (
+                                  <div className="flex aspect-square w-full items-center justify-center border border-dashed border-border text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                    missing
+                                  </div>
+                                )}
+                                {reportUrl ? (
+                                  <button
+                                    aria-label={`Show render report for ${material.name} on ${rendererName}`}
+                                    className="absolute right-2 bottom-2 inline-flex size-7 items-center justify-center rounded-full border border-border bg-background/85 text-foreground shadow-sm backdrop-blur-sm transition-colors hover:bg-background"
+                                    onClick={() =>
+                                      setActiveReport({ materialName: material.name, rendererName, reportUrl })
+                                    }
+                                    type="button"
+                                  >
+                                    <Info className="size-4" />
+                                  </button>
+                                ) : null}
+                              </div>
+                              <figcaption className="text-center text-xs font-medium text-muted-foreground">
+                                {rendererName}
+                              </figcaption>
+                            </figure>
+                          );
+                        })}
+                        {groupIndex < data.rendererGroups.length - 1 ? (
+                          <div
+                            aria-hidden="true"
+                            className="my-1 w-px self-stretch bg-border"
+                          />
+                        ) : null}
                       </div>
-                    </div>
+                    ))}
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
 
-                    <div className="mt-3 overflow-x-auto pb-2">
-                      <div className="flex min-w-full justify-center gap-4">
-                        {data.rendererGroups.map((rendererGroup, groupIndex) => (
-                          <div key={rendererGroup.category} className="flex flex-none items-stretch gap-4">
-                            {rendererGroup.renderers.map((rendererName) => {
-                              const imageUrl = material.images[rendererName];
-                              return (
-                                <figure key={rendererName} className="flex w-[170px] flex-none flex-col gap-2 sm:w-[200px]">
-                                  {imageUrl ? (
-                                    <img
-                                      alt={`${material.name} rendered by ${rendererName}`}
-                                      className="aspect-square w-full border border-border object-cover"
-                                      loading="lazy"
-                                      src={imageUrl}
-                                    />
-                                  ) : (
-                                    <div className="flex aspect-square w-full items-center justify-center border border-dashed border-border text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                      missing
-                                    </div>
-                                  )}
-                                  <figcaption className="text-center text-xs font-medium text-muted-foreground">
-                                    {rendererName}
-                                  </figcaption>
-                                </figure>
-                              );
-                            })}
-                            {groupIndex < data.rendererGroups.length - 1 ? (
-                              <div
-                                aria-hidden="true"
-                                className="my-1 w-px self-stretch bg-border"
-                              />
-                            ) : null}
-                          </div>
+      {activeReport ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setActiveReport(null)}
+          role="presentation"
+        >
+          <section
+            aria-modal="true"
+            className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-lg border border-border bg-background shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+          >
+            <header className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-border bg-background/95 px-5 py-4 backdrop-blur">
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">Render report</h3>
+                <p className="text-sm text-muted-foreground">
+                  {activeReport.materialName} - {activeReport.rendererName}
+                </p>
+              </div>
+              <button
+                aria-label="Close report dialog"
+                className="inline-flex size-8 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                onClick={() => setActiveReport(null)}
+                type="button"
+              >
+                <X className="size-4" />
+              </button>
+            </header>
+
+            <div className="space-y-4 px-5 py-4 text-sm">
+              {isReportLoading ? <p className="text-muted-foreground">Loading report...</p> : null}
+
+              {activeReportError ? (
+                <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-destructive">
+                  {activeReportError}
+                </p>
+              ) : null}
+
+              {activeReportData ? (
+                <>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <div className="rounded-md border border-border bg-muted/20 px-3 py-2">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Status</p>
+                      <p className="font-medium text-foreground">
+                        {activeReportData.success === true
+                          ? 'success'
+                          : activeReportData.success === false
+                            ? 'failed'
+                            : activeReportData.status ?? 'unknown'}
+                      </p>
+                    </div>
+                    <div className="rounded-md border border-border bg-muted/20 px-3 py-2">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Duration</p>
+                      <p className="font-medium text-foreground">{formatDuration(activeReportData.durationMs) ?? 'n/a'}</p>
+                    </div>
+                    <div className="rounded-md border border-border bg-muted/20 px-3 py-2">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Started</p>
+                      <p className="font-medium text-foreground">{activeReportData.startedAt ?? 'n/a'}</p>
+                    </div>
+                    <div className="rounded-md border border-border bg-muted/20 px-3 py-2">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Completed</p>
+                      <p className="font-medium text-foreground">{activeReportData.completedAt ?? 'n/a'}</p>
+                    </div>
+                  </div>
+
+                  {activeReportData.error ? (
+                    <section className="space-y-2">
+                      <h4 className="font-semibold text-foreground">Error</h4>
+                      <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2">
+                        <p className="font-medium text-destructive">
+                          {activeReportData.error.name ? `${activeReportData.error.name}: ` : ''}
+                          {activeReportData.error.message ?? 'Unknown error'}
+                        </p>
+                        {activeReportData.error.stack ? (
+                          <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-words text-xs text-destructive">
+                            {activeReportData.error.stack}
+                          </pre>
+                        ) : null}
+                      </div>
+                    </section>
+                  ) : null}
+
+                  {(activeReportData.validationIssues?.length || activeReportData.issues?.length) && (
+                    <section className="space-y-2">
+                      <h4 className="font-semibold text-foreground">Validation issues</h4>
+                      <ul className="space-y-2">
+                        {(activeReportData.validationIssues ?? activeReportData.issues ?? []).map((issue, index) => (
+                          <li key={`${issue.location ?? 'issue'}-${index}`} className="rounded-md border border-border px-3 py-2">
+                            <p className="font-medium text-foreground">
+                              {issue.level ?? 'issue'} {issue.location ? `- ${issue.location}` : ''}
+                            </p>
+                            <p className="mt-1 text-muted-foreground">{issue.message ?? 'No message provided.'}</p>
+                          </li>
                         ))}
-                      </div>
-                    </div>
-                  </article>
-                );
-              })}
+                      </ul>
+                    </section>
+                  )}
+
+                  <section className="space-y-2">
+                    <h4 className="font-semibold text-foreground">Log messages</h4>
+                    {activeReportData.logs && activeReportData.logs.length > 0 ? (
+                      <ul className="space-y-2">
+                        {activeReportData.logs.map((entry, index) => (
+                          <li key={`${entry.message ?? 'log'}-${index}`} className="rounded-md border border-border px-3 py-2">
+                            <p className="font-medium text-foreground">
+                              {(entry.level ?? 'log').toUpperCase()}
+                              {entry.source ? ` - ${entry.source}` : ''}
+                            </p>
+                            <p className="mt-1 text-muted-foreground">{entry.message ?? '(empty message)'}</p>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-muted-foreground">No log messages.</p>
+                    )}
+                  </section>
+                </>
+              ) : null}
             </div>
           </section>
-        );
-      })}
+        </div>
+      ) : null}
     </main>
   );
 }
