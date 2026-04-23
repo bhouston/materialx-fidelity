@@ -1,6 +1,6 @@
 packages:
   - packages/*
-  - third_party/materialx.js/packages/*
+  - third_party/material-viewer/packages/*
 
 link-workspace-packages: true
 

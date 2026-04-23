@@ -50,7 +50,7 @@ afterEach(async () => {
 describe('materialxjs renderer', () => {
   it('creates a new page for each render and closes it', async () => {
     const thirdPartyRoot = await makeTempDir('third-party-');
-    await createFile(path.join(thirdPartyRoot, 'materialx.js', 'README.md'));
+    await createFile(path.join(thirdPartyRoot, 'material-viewer', 'README.md'));
 
     const server = {
       listen: vi.fn<() => Promise<void>>(async () => undefined),

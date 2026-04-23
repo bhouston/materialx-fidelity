@@ -105,7 +105,7 @@ class MaterialXJsRenderer implements FidelityRenderer {
     }
 
     try {
-      const materialxJsRoot = join(this.thirdPartyRoot, 'materialx.js');
+      const materialxJsRoot = join(this.thirdPartyRoot, 'material-viewer');
       const missingFiles = await findMissingFiles([materialxJsRoot]);
       if (missingFiles.length > 0) {
         return { success: false, message: `Missing required dependency: ${missingFiles.join(', ')}` };
@@ -140,7 +140,7 @@ class MaterialXJsRenderer implements FidelityRenderer {
     const threeRoot = join(workspaceRoot, 'node_modules', 'three');
     const materialxThreePackageEntry = join(
       this.thirdPartyRoot,
-      'materialx.js',
+      'material-viewer',
       'packages',
       'materialx-three',
       'src',

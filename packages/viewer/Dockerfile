@@ -18,7 +18,7 @@ RUN pnpm fetch --reporter=silent
 COPY . .
 
 RUN test -d /app/third_party/materialx-samples/materials
-RUN test -d /app/third_party/materialx.js/packages/materialx/src
+RUN test -d /app/third_party/material-viewer/packages/materialx/src
 
 RUN pnpm install --frozen-lockfile --prefer-offline
 

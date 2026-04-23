@@ -29,15 +29,15 @@ pnpm cli create-references --renderers materialxjs --materials open_pbr
 This renderer is based on the MaterialX JavaScript project and capture flow concepts from:
 
 - `../MaterialX/javascript`
-- `third_party/materialx.js/apps/viewer/src/routes/embed.tsx`
-- `third_party/materialx.js/apps/viewer/src/hooks/useMaterialXCompile.ts`
-- `third_party/materialx.js/apps/viewer/src/lib/browser-texture-resolver.ts`
+- `third_party/material-viewer/apps/viewer/src/routes/embed.tsx`
+- `third_party/material-viewer/apps/viewer/src/hooks/useMaterialXCompile.ts`
+- `third_party/material-viewer/apps/viewer/src/lib/browser-texture-resolver.ts`
 
 ## Sync From Upstream
 
 When upstream MaterialX JavaScript changes, use this checklist:
 
-1. update your local `../MaterialX` checkout (`git pull`) and refresh `third_party/materialx.js` as needed
+1. update your local `../MaterialX` checkout (`git pull`) and refresh `third_party/material-viewer` as needed
 2. compare upstream viewer/compiler texture-loading behavior against `viewer/src/main.tsx`
 3. copy/adapt any required logic changes into this package (keep capture-only behavior)
 4. run validation:

@@ -1,6 +1,6 @@
 [submodule "third_party/materialx-samples"]
 	path = third_party/materialx-samples
 	url = https://github.com/bhouston/materialx-samples.git
-[submodule "third_party/materialx.js"]
-	path = third_party/materialx.js
-	url = https://github.com/bhouston/materialx.js.git
+[submodule "third_party/material-viewer"]
+	path = third_party/material-viewer
+	url = https://github.com/bhouston/material-viewer.git

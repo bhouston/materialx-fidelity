@@ -75,7 +75,7 @@ importers:
     dependencies:
       '@materialx-js/materialx':
         specifier: workspace:*
-        version: link:../../third_party/materialx.js/packages/materialx
+        version: link:../../third_party/material-viewer/packages/materialx
       p-limit:
         specifier: ^7.3.0
         version: 7.3.0
@@ -97,10 +97,10 @@ importers:
         version: link:../core
       '@materialx-js/materialx':
         specifier: workspace:*
-        version: link:../../third_party/materialx.js/packages/materialx
+        version: link:../../third_party/material-viewer/packages/materialx
       '@materialx-js/materialx-three':
         specifier: workspace:*
-        version: link:../../third_party/materialx.js/packages/materialx-three
+        version: link:../../third_party/material-viewer/packages/materialx-three
       '@vitejs/plugin-react':
         specifier: ^6.0.1
         version: 6.0.1(vite@8.0.9(@types/node@25.6.0)(esbuild@0.27.7)(jiti@2.6.1)(tsx@4.21.0))
@@ -256,7 +256,7 @@ importers:
         specifier: ^3.0.5
         version: 3.2.4(@types/node@22.19.17)(jiti@2.6.1)(jsdom@28.1.0)(lightningcss@1.32.0)(tsx@4.21.0)
 
-  third_party/materialx.js/packages/materialx:
+  third_party/material-viewer/packages/materialx:
     dependencies:
       fast-xml-parser:
         specifier: ^5.3.0
@@ -266,7 +266,7 @@ importers:
         specifier: ^24
         version: 24.12.2
 
-  third_party/materialx.js/packages/materialx-cli:
+  third_party/material-viewer/packages/materialx-cli:
     dependencies:
       '@materialx-js/materialx':
         specifier: workspace:*
@@ -297,7 +297,7 @@ importers:
         specifier: ^0.7.0
         version: 0.7.0(vitest@4.1.5)
 
-  third_party/materialx.js/packages/materialx-three:
+  third_party/material-viewer/packages/materialx-three:
     dependencies:
       '@materialx-js/materialx':
         specifier: workspace:*
