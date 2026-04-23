@@ -292,6 +292,8 @@ class MaterialXNode {
         node = this.getMatrix(3) || mat3(1, 0, 0, 0, 1, 0, 0, 0, 1);
       } else if (type === 'matrix44') {
         node = this.getMatrix(4) || mat4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
+      } else if (type === 'string') {
+        node = this.getValue();
       } else {
         const nodeClass = this.getClassFromType(type);
         node = nodeClass ? nodeClass(...this.getVector()) : float(0);

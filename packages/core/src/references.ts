@@ -329,6 +329,7 @@ export async function createReferences(options: CreateReferencesOptions): Promis
 
           if (renderError) {
             await rm(outputTempPngPath, { force: true });
+            await rm(outputPngPath, { force: true });
           }
 
           const completedAt = Date.now();

@@ -644,7 +644,7 @@ export function createAdapter() {
 
     const outputPngPath = path.join(materialDir, 'fake.png');
     const outputJsonPath = path.join(materialDir, 'fake.json');
-    await expect(access(outputPngPath)).resolves.toBeUndefined();
+    await expect(access(outputPngPath)).rejects.toThrow('ENOENT');
     await expect(access(path.join(materialDir, 'fake-temp.png'))).rejects.toThrow('ENOENT');
     await expect(access(path.join(materialDir, 'fake.webp'))).rejects.toThrow('ENOENT');
     await access(outputJsonPath);
@@ -661,6 +661,38 @@ export function createAdapter() {
     expect(result.failures).toHaveLength(1);
     expect(result.failures[0]?.rendererName).toBe('fake');
     expect(result.failures[0]?.error.message).toContain('Render output is empty');
+  });
+
+  it('deletes an existing png when a renderer throws a failure', async () => {
+    const root = await makeTempDir('fidelity-');
+    const thirdPartyRoot = path.join(root, 'third-party');
+    const samplesRoot = path.join(thirdPartyRoot, 'material-samples');
+    const materialDir = path.join(samplesRoot, 'materials', 'surfaces', 'standard_surface', 'renderer-throws');
+    const viewerDir = path.join(samplesRoot, 'viewer');
+    const renderer = createPngWriterRenderer(NON_BLACK_PIXEL_PNG_BASE64, 'fake');
+
+    renderer.generateImage = async () => {
+      throw new Error('Renderer failed');
+    };
+
+    await mkdir(materialDir, { recursive: true });
+    await mkdir(viewerDir, { recursive: true });
+    await writeFile(path.join(materialDir, 'material.mtlx'), VALID_MTLX_DOCUMENT, 'utf8');
+    await writeFile(path.join(viewerDir, 'san_giuseppe_bridge_2k.hdr'), 'hdr', 'utf8');
+    await writeFile(path.join(viewerDir, 'ShaderBall.glb'), 'glb', 'utf8');
+    await writeFile(path.join(materialDir, 'fake.png'), 'stale png from previous run', 'utf8');
+
+    const result = await createReferences({
+      thirdPartyRoot,
+      renderers: [renderer],
+      rendererNames: ['fake'],
+      concurrency: 1,
+    });
+
+    await expect(access(path.join(materialDir, 'fake.png'))).rejects.toThrow('ENOENT');
+    expect(result.rendered).toBe(0);
+    expect(result.failures).toHaveLength(1);
+    expect(result.failures[0]?.error.message).toContain('Renderer failed');
   });
 
   it('fails early when material-samples directory is missing', async () => {

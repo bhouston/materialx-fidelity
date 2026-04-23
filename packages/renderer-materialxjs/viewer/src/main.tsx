@@ -37,6 +37,14 @@ const IDEAL_MESH_SPHERE_RADIUS = 2;
 const REFERENCE_IMAGE_WIDTH = 512;
 const REFERENCE_IMAGE_HEIGHT = 512;
 const DISABLED_NODE_CATEGORIES = new Set(['artistic_ior']);
+const nodeNamespace = THREE as typeof THREE & {
+  Node?: {
+    captureStackTrace?: boolean;
+  };
+};
+if (nodeNamespace.Node) {
+  nodeNamespace.Node.captureStackTrace = true;
+}
 
 function parseQuery(search: string): ViewerQuery {
   const rawQuery = Object.fromEntries(new URLSearchParams(search).entries());

@@ -29,6 +29,21 @@ function toAnchorId(value: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
+function normalizeMaterialFilters(materialFilter: string | undefined): string[] {
+  if (!materialFilter) {
+    return [];
+  }
+
+  return [
+    ...new Set(
+      materialFilter
+        .split(',')
+        .map((filter) => filter.trim().toLocaleLowerCase())
+        .filter((filter) => filter.length > 0),
+    ),
+  ];
+}
+
 interface ReportIssue {
   level?: string;
   location?: string;
@@ -61,7 +76,7 @@ function App() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const ga = useGoogleAnalytics();
-  const materialSearch = search.materials?.trim().toLocaleLowerCase() ?? '';
+  const materialSearchTerms = normalizeMaterialFilters(search.materials);
   const [activeReport, setActiveReport] = useState<ActiveReportState | null>(null);
   const [activeReportData, setActiveReportData] = useState<RenderReport | null>(null);
   const [activeReportError, setActiveReportError] = useState<string | null>(null);
@@ -72,9 +87,16 @@ function App() {
     .map((group) => ({
       ...group,
       materials: group.materials.filter(
-        (material) =>
-          material.name.toLocaleLowerCase().includes(materialSearch) ||
-          material.displayPath.toLocaleLowerCase().includes(materialSearch),
+        (material) => {
+          if (materialSearchTerms.length === 0) {
+            return true;
+          }
+          const lowerName = material.name.toLocaleLowerCase();
+          const lowerDisplayPath = material.displayPath.toLocaleLowerCase();
+          return materialSearchTerms.some(
+            (term) => lowerName.includes(term) || lowerDisplayPath.includes(term),
+          );
+        },
       ),
     }))
     .filter((group) => group.materials.length > 0);
@@ -321,7 +343,7 @@ function App() {
             <input
               className="h-10 rounded-none border border-border bg-background px-3 text-sm font-normal text-foreground shadow-xs outline-none transition-colors placeholder:text-muted-foreground focus:border-primary"
               onChange={(event) => handleMaterialSearchChange(event.currentTarget.value)}
-              placeholder="Search by name or path..."
+              placeholder="Search by name or path (comma-separated)..."
               type="text"
               value={search.materials ?? ''}
             />

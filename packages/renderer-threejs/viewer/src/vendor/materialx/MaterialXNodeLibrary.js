@@ -62,6 +62,9 @@ import {
   float,
   int,
   color,
+  modelNormalMatrix,
+  modelWorldMatrix,
+  modelWorldMatrixInverse,
   vec2,
   vec3,
   vec4,
@@ -199,7 +202,69 @@ const mx_screen = (fg, bg, mixval = 1) => {
   const screened = sub(1, mul(sub(1, fg), sub(1, bg)));
   return mix(bg, screened, mixval);
 };
+const mx_overlay = (fg, bg, mixval = 1) => {
+  const lowBranch = mul(mul(2, fg), bg);
+  const highBranch = sub(1, mul(mul(2, sub(1, fg)), sub(1, bg)));
+  const overlayed = mix(lowBranch, highBranch, step(0.5, bg));
+  return mix(bg, overlayed, mixval);
+};
 const mx_mod = (in1, in2) => sub(in1, mul(in2, floor(div(in1, in2))));
+
+const normalizeSpaceName = (value, fallback = 'world') => {
+  if (typeof value !== 'string') return fallback;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === '') return fallback;
+  if (normalized === 'world') return 'world';
+  if (normalized === 'object' || normalized === 'model') return 'object';
+  return fallback;
+};
+
+const mx_transformnormal = (inNode = vec3(0, 0, 1), fromspace = 'world', tospace = 'world') => {
+  const from = normalizeSpaceName(fromspace, 'world');
+  const to = normalizeSpaceName(tospace, 'world');
+  const inNormal = vec3(inNode);
+
+  if (from === to) {
+    return normalize(inNormal);
+  }
+
+  if (from === 'object' && to === 'world') {
+    return normalize(mul(modelNormalMatrix, inNormal));
+  }
+
+  return normalize(mul(mat3(modelWorldMatrix), inNormal));
+};
+
+const mx_transformvector = (inNode = vec3(0, 0, 0), fromspace = 'world', tospace = 'world') => {
+  const from = normalizeSpaceName(fromspace, 'world');
+  const to = normalizeSpaceName(tospace, 'world');
+  const inVector = vec3(inNode);
+
+  if (from === to) {
+    return inVector;
+  }
+
+  if (from === 'object' && to === 'world') {
+    return mul(mat3(modelWorldMatrix), inVector);
+  }
+
+  return mul(mat3(modelWorldMatrixInverse), inVector);
+};
+
+const mx_transformpoint = (inNode = vec3(0, 0, 0), fromspace = 'world', tospace = 'world') => {
+  const from = normalizeSpaceName(fromspace, 'world');
+  const to = normalizeSpaceName(tospace, 'world');
+  const inPoint = vec3(inNode);
+
+  if (from === to) {
+    return inPoint;
+  }
+
+  const point4 = vec4(inPoint, 1);
+  const matrix = from === 'object' && to === 'world' ? modelWorldMatrix : modelWorldMatrixInverse;
+  const transformed4 = mul(matrix, point4);
+  return vec3(element(transformed4, 0), element(transformed4, 1), element(transformed4, 2));
+};
 
 const mx_burn_channel = (fg, bg, mixval = 1) => {
   const composed = add(mul(mixval, sub(1, div(sub(1, bg), fg))), mul(sub(1, mixval), bg));
@@ -468,6 +533,21 @@ const MXElements = [
   new MXElement('distance', distance, ['in1', 'in2'], { in1: defaultFloat(0), in2: defaultFloat(0) }),
   new MXElement('invert', mx_invert, ['in', 'amount'], { in: defaultFloat(0), amount: defaultFloat(1) }),
   new MXElement('transformmatrix', mul, ['in', 'mat'], { in: defaultFloat(0) }),
+  new MXElement('transformnormal', mx_transformnormal, ['in', 'fromspace', 'tospace'], {
+    in: defaultVec3(0, 0, 1),
+    fromspace: () => 'world',
+    tospace: () => 'world',
+  }),
+  new MXElement('transformpoint', mx_transformpoint, ['in', 'fromspace', 'tospace'], {
+    in: defaultVec3(0, 0, 0),
+    fromspace: () => 'world',
+    tospace: () => 'world',
+  }),
+  new MXElement('transformvector', mx_transformvector, ['in', 'fromspace', 'tospace'], {
+    in: defaultVec3(0, 0, 0),
+    fromspace: () => 'world',
+    tospace: () => 'world',
+  }),
   new MXElement('normalmap', normalMap, ['in', 'scale'], { in: defaultVec3(0.5, 0.5, 1.0), scale: defaultFloat(1) }),
   new MXElement('transpose', transpose, ['in']),
   new MXElement('determinant', determinant, ['in']),
@@ -515,6 +595,11 @@ const MXElements = [
     mix: defaultFloat(1),
   }),
   new MXElement('screen', mx_screen, ['fg', 'bg', 'mix'], {
+    fg: defaultFloat(0),
+    bg: defaultFloat(0),
+    mix: defaultFloat(1),
+  }),
+  new MXElement('overlay', mx_overlay, ['fg', 'bg', 'mix'], {
     fg: defaultFloat(0),
     bg: defaultFloat(0),
     mix: defaultFloat(1),
@@ -822,5 +907,6 @@ SUPPORTED_NODE_CATEGORIES.add('texcoord');
 SUPPORTED_NODE_CATEGORIES.add('geomcolor');
 SUPPORTED_NODE_CATEGORIES.add('image');
 SUPPORTED_NODE_CATEGORIES.add('tiledimage');
+SUPPORTED_NODE_CATEGORIES.add('transformnormal');
 
 export { MtlXLibrary, SUPPORTED_NODE_CATEGORIES };
