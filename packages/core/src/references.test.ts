@@ -924,6 +924,16 @@ export function createAdapter() {
             source: 'browser',
             message: 'Download the React DevTools for a better development experience',
           },
+          {
+            level: 'warning',
+            source: 'renderer',
+            message: 'Image file not found: /Users/me/material-samples/viewer/irradiance/san_giuseppe_bridge_2k.hdr',
+          },
+          {
+            level: 'info',
+            source: 'renderer',
+            message: 'Wrote frame to disk: /tmp/materialxview/output.png',
+          },
           { level: 'info', source: 'renderer', message: 'render started' },
           { level: 'warning', source: 'renderer', message: 'minor warning' },
         ],

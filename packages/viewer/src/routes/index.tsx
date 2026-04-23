@@ -3,6 +3,8 @@ import { createServerFn } from '@tanstack/react-start';
 import { ExternalLink, DownloadIcon, Info, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useGoogleAnalytics } from 'tanstack-router-ga4';
+import { RenderLogViewer } from '#/components/RenderLogViewer';
+import type { ReportLogEntry } from '#/components/RenderLogViewer';
 import { getViewerIndexData } from '#/lib/material-index';
 
 const getViewerData = createServerFn({
@@ -25,12 +27,6 @@ function toAnchorId(value: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
-}
-
-interface ReportLogEntry {
-  level?: string;
-  source?: string;
-  message?: string;
 }
 
 interface ReportIssue {
@@ -521,24 +517,7 @@ function App() {
 
                   <section className="space-y-2">
                     <h4 className="font-semibold text-foreground">Log messages</h4>
-                    {activeReportData.logs && activeReportData.logs.length > 0 ? (
-                      <ul className="space-y-2">
-                        {activeReportData.logs.map((entry, index) => (
-                          <li
-                            key={`${entry.message ?? 'log'}-${index}`}
-                            className="rounded-md border border-border px-3 py-2"
-                          >
-                            <p className="font-medium text-foreground">
-                              {(entry.level ?? 'log').toUpperCase()}
-                              {entry.source ? ` - ${entry.source}` : ''}
-                            </p>
-                            <p className="mt-1 text-muted-foreground">{entry.message ?? '(empty message)'}</p>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-muted-foreground">No log messages.</p>
-                    )}
+                    <RenderLogViewer logs={activeReportData.logs} />
                   </section>
                 </>
               ) : null}

@@ -52,10 +52,17 @@ interface RenderResultReportOptions {
   logs?: RenderLogEntry[];
 }
 
-const NOISY_LOG_MESSAGE_SUBSTRINGS = ['Download the React DevTools for a better development experience'];
+const NOISY_LOG_MESSAGE_SUBSTRINGS = [
+  'Download the React DevTools for a better development experience',
+  'Wrote frame to disk:',
+];
+const MATERIALXVIEW_IRRADIANCE_WARNING_PATTERN = /Image file not found: .*\/irradiance\/san_giuseppe_bridge_2k\.hdr$/;
 
 function isNoisyLogMessage(message: string): boolean {
-  return NOISY_LOG_MESSAGE_SUBSTRINGS.some((substring) => message.includes(substring));
+  return (
+    NOISY_LOG_MESSAGE_SUBSTRINGS.some((substring) => message.includes(substring)) ||
+    MATERIALXVIEW_IRRADIANCE_WARNING_PATTERN.test(message)
+  );
 }
 
 function filterReportableLogs(logs: RenderLogEntry[]): RenderLogEntry[] {
