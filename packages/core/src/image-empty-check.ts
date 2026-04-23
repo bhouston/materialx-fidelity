@@ -1,6 +1,6 @@
 import sharp from 'sharp';
 
-const EMPTY_IMAGE_RMS_THRESHOLD = 0.01;
+const EMPTY_IMAGE_RMS_THRESHOLD = 0.005;
 const cachedReferenceImages = new Map<string, Promise<RawRgbaImage>>();
 
 interface RawRgbaImage {

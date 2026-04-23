@@ -25,7 +25,6 @@ import {
   pow,
   distance,
   remap,
-  smoothstep,
   luminance,
   mx_rgbtohsv,
   mx_hsvtorgb,
@@ -105,7 +104,10 @@ const mx_checkerboard = (color1, color2, texcoord) => mix(color1, color2, clamp(
 // Match MaterialX smoothstep semantics for degenerate ranges:
 // when high <= low, behave like step(high, in) instead of relying on GPU undefined behavior.
 const mx_smoothstep_materialx = (inNode, low = 0, high = 1) => {
-  const hermite = smoothstep(low, high, inNode);
+  const range = sub(high, low);
+  const safeRange = max(abs(range), float(1e-6));
+  const t = clamp(div(sub(inNode, low), safeRange), float(0), float(1));
+  const hermite = mul(mul(t, t), sub(float(3), mul(float(2), t)));
   const fallback = step(high, inNode);
   const useFallback = step(high, low);
   return mix(hermite, fallback, useFallback);
@@ -193,6 +195,10 @@ const mx_colorcorrect = (
 
 const mx_minus = (fg, bg, mixval = 1) => add(mul(mixval, sub(bg, fg)), mul(sub(1, mixval), bg));
 const mx_difference = (fg, bg, mixval = 1) => add(mul(mixval, abs(sub(bg, fg))), mul(sub(1, mixval), bg));
+const mx_screen = (fg, bg, mixval = 1) => {
+  const screened = sub(1, mul(sub(1, fg), sub(1, bg)));
+  return mix(bg, screened, mixval);
+};
 const mx_mod = (in1, in2) => sub(in1, mul(in2, floor(div(in1, in2))));
 
 const mx_burn_channel = (fg, bg, mixval = 1) => {
@@ -257,7 +263,7 @@ const mx_ramp4 = (valuetl, valuetr, valuebl, valuebr, texcoord = vec2(0, 0)) => 
   const t = element(clamped, 1);
   const topMix = mix(valuetl, valuetr, s);
   const bottomMix = mix(valuebl, valuebr, s);
-  return mix(bottomMix, topMix, t);
+  return mix(topMix, bottomMix, t);
 };
 
 const mx_rotate2d_materialx = (inNode, amount = 0) => {
@@ -330,7 +336,7 @@ const mx_ramp_gradient = (
   const rangeSize = sub(interval2Float, interval1Float);
   const safeRange = max(rangeSize, float(1e-6));
   const linearRemap = div(sub(linearClamped, interval1Float), safeRange);
-  const smoothVal = smoothstep(interval1Float, interval2Float, xFloat);
+  const smoothVal = mx_smoothstep_materialx(xFloat, interval1Float, interval2Float);
   const interpolationDistanceToLinear = abs(sub(interpolationFloat, float(0)));
   const useLinear = sub(float(1), step(float(0.5), interpolationDistanceToLinear));
   const interpFactor = mix(smoothVal, linearRemap, useLinear);
@@ -341,6 +347,79 @@ const mx_ramp_gradient = (
   const interpolated = mixColor4(mixedColor, stepColor, useStep);
   const withinInterval = mixColor4(prevColor, interpolated, step(add(interval1Float, float(1e-6)), xFloat));
   return mixColor4(withinInterval, prevColor, step(numIntervalsFloat, intervalNumFloat));
+};
+
+const mx_ramp = (texcoord = vec2(0, 0), type = 0, interpolation = 1, numIntervals = 2, ...rest) => {
+  const mixColor4 = (bg, fg, factor) =>
+    vec4(
+      mix(element(bg, 0), element(fg, 0), factor),
+      mix(element(bg, 1), element(fg, 1), factor),
+      mix(element(bg, 2), element(fg, 2), factor),
+      mix(element(bg, 3), element(fg, 3), factor),
+    );
+
+  const rampTypeFloat = float(type);
+  const interpolationFloat = float(interpolation);
+  const numIntervalsFloat = float(numIntervals);
+
+  const clamped = clamp(texcoord, vec2(0, 0), vec2(1, 1));
+  const s = element(clamped, 0);
+  const t = element(clamped, 1);
+
+  const centeredS = sub(s, float(0.5));
+  const centeredT = sub(t, float(0.5));
+
+  const radialDist = sqrt(add(mul(centeredS, centeredS), mul(centeredT, centeredT)));
+  const radialVal = clamp(mul(radialDist, float(2)), float(0), float(1));
+  const circularAngle = add(div(mx_atan2(centeredT, centeredS), float(Math.PI * 2)), float(0.5));
+  const boxVal = clamp(mul(max(abs(centeredS), abs(centeredT)), float(2)), float(0), float(1));
+
+  const typeDistanceToRadial = abs(sub(rampTypeFloat, float(1)));
+  const typeDistanceToCircular = abs(sub(rampTypeFloat, float(2)));
+  const typeDistanceToBox = abs(sub(rampTypeFloat, float(3)));
+  const useRadial = sub(float(1), step(float(0.5), typeDistanceToRadial));
+  const useCircular = sub(float(1), step(float(0.5), typeDistanceToCircular));
+  const useBox = sub(float(1), step(float(0.5), typeDistanceToBox));
+  const afterRadial = mix(s, radialVal, useRadial);
+  const afterCircular = mix(afterRadial, circularAngle, useCircular);
+  const rampX = mix(afterCircular, boxVal, useBox);
+
+  const intervals = [];
+  const colors = [];
+  for (let i = 0; i < 10; i += 1) {
+    const intervalInput = rest[i * 2];
+    const colorInput = rest[i * 2 + 1];
+    intervals.push(intervalInput ?? float(i <= 1 ? i : 1));
+    colors.push(colorInput ?? vec4(i === 0 ? 0 : 1, i === 0 ? 0 : 1, i === 0 ? 0 : 1, 1));
+  }
+
+  let result = colors[0];
+  for (let i = 0; i < 9; i += 1) {
+    const iv1 = intervals[i];
+    const iv2 = intervals[i + 1];
+    const c1 = colors[i];
+    const c2 = colors[i + 1];
+    const intNum = float(i + 1);
+
+    const rangeSize = sub(iv2, iv1);
+    const safeRange = max(rangeSize, float(1e-6));
+    const linearClamped = clamp(rampX, iv1, iv2);
+    const linearRemap = div(sub(linearClamped, iv1), safeRange);
+    const smoothVal = mx_smoothstep_materialx(rampX, iv1, iv2);
+
+    const interpolationDistanceToLinear = abs(sub(interpolationFloat, float(0)));
+    const useLinear = sub(float(1), step(float(0.5), interpolationDistanceToLinear));
+    const interpFactor = mix(smoothVal, linearRemap, useLinear);
+    const mixedColor = mixColor4(c1, c2, interpFactor);
+    const stepColor = mixColor4(c1, c2, step(iv2, rampX));
+    const interpolationDistanceToStep = abs(sub(interpolationFloat, float(2)));
+    const useStep = sub(float(1), step(float(0.5), interpolationDistanceToStep));
+    const interpolated = mixColor4(mixedColor, stepColor, useStep);
+    const withinInterval = mixColor4(result, interpolated, step(add(iv1, float(1e-6)), rampX));
+    result = mixColor4(withinInterval, result, step(numIntervalsFloat, intNum));
+  }
+
+  return result;
 };
 
 const defaultFloat = (value) => () => float(value);
@@ -435,6 +514,11 @@ const MXElements = [
     bg: defaultFloat(0),
     mix: defaultFloat(1),
   }),
+  new MXElement('screen', mx_screen, ['fg', 'bg', 'mix'], {
+    fg: defaultFloat(0),
+    bg: defaultFloat(0),
+    mix: defaultFloat(1),
+  }),
   new MXElement('burn', mx_burn, ['fg', 'bg', 'mix'], {
     fg: defaultFloat(0),
     bg: defaultFloat(0),
@@ -503,6 +587,62 @@ const MXElements = [
       prev_color: defaultVec4(0, 0, 0, 1),
       interval_num: defaultFloat(1),
       num_intervals: defaultFloat(2),
+    },
+  ),
+  new MXElement(
+    'ramp',
+    mx_ramp,
+    [
+      'texcoord',
+      'type',
+      'interpolation',
+      'num_intervals',
+      'interval1',
+      'color1',
+      'interval2',
+      'color2',
+      'interval3',
+      'color3',
+      'interval4',
+      'color4',
+      'interval5',
+      'color5',
+      'interval6',
+      'color6',
+      'interval7',
+      'color7',
+      'interval8',
+      'color8',
+      'interval9',
+      'color9',
+      'interval10',
+      'color10',
+    ],
+    {
+      texcoord: defaultVec2(0, 0),
+      type: defaultFloat(0),
+      interpolation: defaultFloat(1),
+      num_intervals: defaultFloat(2),
+      interval1: defaultFloat(0),
+      color1: defaultVec4(0, 0, 0, 1),
+      interval2: defaultFloat(1),
+      color2: defaultVec4(1, 1, 1, 1),
+      interval3: defaultFloat(1),
+      color3: defaultVec4(1, 1, 1, 1),
+      interval4: defaultFloat(1),
+      color4: defaultVec4(1, 1, 1, 1),
+      interval5: defaultFloat(1),
+      color5: defaultVec4(1, 1, 1, 1),
+      interval6: defaultFloat(1),
+      color6: defaultVec4(1, 1, 1, 1),
+      interval7: defaultFloat(1),
+      color7: defaultVec4(1, 1, 1, 1),
+      interval8: defaultFloat(1),
+      color8: defaultVec4(1, 1, 1, 1),
+      interval9: defaultFloat(1),
+      color9: defaultVec4(1, 1, 1, 1),
+      interval10: defaultFloat(1),
+      color10: defaultVec4(1, 1, 1, 1),
     },
   ),
   new MXElement('splitlr', mx_splitlr, ['valuel', 'valuer', 'center', 'texcoord'], {

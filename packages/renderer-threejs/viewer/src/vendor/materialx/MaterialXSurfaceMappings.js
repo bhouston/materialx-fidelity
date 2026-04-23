@@ -75,6 +75,7 @@ const mappedOpenPbrInputs = new Set([
   'specular_ior',
   'specular_ior_level',
   'coat_weight',
+  'coat_ior',
   'coat_color',
   'coat_roughness',
   'geometry_coat_normal',
@@ -359,7 +360,17 @@ function applyOpenPbrSurface(material, inputs, issueCollector, nodeName) {
   setAnisotropy(material, inputs.specular_roughness_anisotropy, float(0));
 
   if (coatEnabled) {
-    material.clearcoatNode = inputs.coat_weight;
+    const coatWeightNode = inputs.coat_weight || float(0);
+    if (hasNodeValue(inputs.coat_ior)) {
+      const coatIorNode = inputs.coat_ior;
+      const coatIorMinusOne = coatIorNode.sub(float(1));
+      const coatIorPlusOne = coatIorNode.add(float(1));
+      const coatF0Node = coatIorMinusOne.div(coatIorPlusOne);
+      const normalizedClearcoatNode = coatF0Node.mul(coatF0Node).div(float(0.04));
+      material.clearcoatNode = clamp(coatWeightNode.mul(normalizedClearcoatNode), float(0), float(1));
+    } else {
+      material.clearcoatNode = coatWeightNode;
+    }
     if (hasNodeValue(inputs.coat_roughness) && isEffectivelyZero(inputs.coat_roughness) === false) {
       material.clearcoatRoughnessNode = inputs.coat_roughness;
     }
