@@ -238,8 +238,10 @@ function applyStandardSurface(material, inputs, issueCollector, nodeName) {
     material.iridescenceIORNode = thinFilmIorNode;
     material.iridescenceNode = float(1);
   }
-  if (sheenEnabled) material.sheenNode = inputs.sheen;
-  material.sheenColorNode = inputs.sheen_color || color(1, 1, 1);
+  const sheenColor = inputs.sheen_color || color(1, 1, 1);
+  if (sheenEnabled) {
+    material.sheenNode = mul(inputs.sheen, sheenColor);
+  }
   if (sheenEnabled && hasNodeValue(inputs.sheen_roughness) && isConstNear(inputs.sheen_roughness, 0.3) === false) {
     material.sheenRoughnessNode = inputs.sheen_roughness;
   }
@@ -290,11 +292,11 @@ function applyGltfPbrSurface(material, inputs, issueCollector, nodeName) {
     }
   }
   if (sheenEnabled) {
-    if (hasNodeValue(inputs.sheen_color)) material.sheenColorNode = inputs.sheen_color;
+    const sheenColor = hasNodeValue(inputs.sheen_color) ? inputs.sheen_color : color(0, 0, 0);
     if (hasNodeValue(inputs.sheen_roughness) && isEffectivelyZero(inputs.sheen_roughness) === false) {
       material.sheenRoughnessNode = inputs.sheen_roughness;
     }
-    material.sheenNode = material.sheenColorNode || color(0, 0, 0);
+    material.sheenNode = sheenColor;
   }
   if (iridescenceEnabled) {
     material.iridescenceNode = inputs.iridescence;
