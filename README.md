@@ -1,6 +1,6 @@
-# MaterialX Fidelity Testing
+# Material Fidelity Testing
 
-MaterialX Fidelity Testing is a TypeScript monorepo for generating and comparing renderer output for known MaterialX sample scenes.
+Material Fidelity Testing is a TypeScript monorepo for generating and comparing renderer output for known MaterialX sample scenes.
 
 ## Repository Layout
 
