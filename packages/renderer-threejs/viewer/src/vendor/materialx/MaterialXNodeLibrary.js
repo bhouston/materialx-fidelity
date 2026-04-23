@@ -58,6 +58,7 @@ import {
   mx_ifequal,
   mx_atan2,
   positionLocal,
+  positionWorld,
   mx_heighttonormal,
   float,
   int,
@@ -125,6 +126,7 @@ const mx_circle = (texcoord, center, radius) => {
 
 const mx_bump = (height, scale = 1) => normalMap(mx_heighttonormal(height, 1), scale);
 const mx_dot = (inNode) => inNode;
+const mx_viewdirection = () => normalize(mul(positionWorld, float(-1)));
 const getRGBChannels = (input) => vec3(element(input, 0), element(input, 1), element(input, 2));
 const mx_blackbody = (temperature = 5000) => {
   const temperatureKelvin = clamp(temperature, float(800), float(25000));
@@ -529,6 +531,7 @@ const MXElements = [
   new MXElement('length', length, ['in'], { in: defaultFloat(0) }),
   new MXElement('dot', mx_dot, ['in'], { in: defaultFloat(0) }),
   new MXElement('dotproduct', dot, ['in1', 'in2'], { in1: defaultFloat(0), in2: defaultFloat(0) }),
+  new MXElement('viewdirection', mx_viewdirection),
   new MXElement('crossproduct', cross, ['in1', 'in2'], { in1: defaultVec3(0, 0, 0), in2: defaultVec3(0, 0, 0) }),
   new MXElement('distance', distance, ['in1', 'in2'], { in1: defaultFloat(0), in2: defaultFloat(0) }),
   new MXElement('invert', mx_invert, ['in', 'amount'], { in: defaultFloat(0), amount: defaultFloat(1) }),
