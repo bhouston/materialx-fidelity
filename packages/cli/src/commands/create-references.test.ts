@@ -67,7 +67,7 @@ describe('create-references command', () => {
         filter: undefined,
         concurrency: 2,
         _: [],
-        $0: 'mtlx-fidelity',
+        $0: 'cli',
       });
 
       expect(stdoutWriteSpy).toHaveBeenCalledWith(
@@ -97,7 +97,7 @@ describe('create-references command', () => {
       filter: 'stdlib',
       concurrency: 1,
       _: [],
-      $0: 'mtlx-fidelity',
+      $0: 'cli',
     });
 
     const [firstCall] = createReferencesMock.mock.calls;
@@ -115,7 +115,7 @@ describe('create-references command', () => {
       filter: undefined,
       concurrency: 1,
       _: [],
-      $0: 'mtlx-fidelity',
+      $0: 'cli',
     });
 
     const [firstCall] = createReferencesMock.mock.calls;

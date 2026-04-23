@@ -2,7 +2,7 @@
   "name": "@material-fidelity/cli",
   "version": "0.1.0",
   "bin": {
-    "mtlx-fidelity": "./dist/bin.js"
+    "cli": "./dist/bin.js"
   },
   "source": "./src/index.ts",
   "files": [

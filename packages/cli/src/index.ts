@@ -11,7 +11,7 @@ export async function runCli(argv = hideBin(process.argv)): Promise<void> {
   });
 
   await yargs(argv)
-    .scriptName('mtlx-fidelity')
+    .scriptName('cli')
     .usage('$0 <command>')
     .command(commandModules)
     .strictCommands()

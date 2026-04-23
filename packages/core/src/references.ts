@@ -22,7 +22,7 @@ import type {
 const VIEWER_HDR_FILENAME = 'san_giuseppe_bridge_2k.hdr';
 const VIEWER_MODEL_FILENAME = 'ShaderBall.glb';
 const DEFAULT_BACKGROUND_COLOR = '0,0,0';
-const RENDER_REPLACE_RMS_THRESHOLD = 0.001;
+const RENDER_REPLACE_RMS_THRESHOLD = 0.0002;
 
 function createOutputPath(materialPath: string, rendererName: string): string {
   return path.join(path.dirname(materialPath), `${rendererName}.png`);

@@ -111,8 +111,16 @@ function hasNodeValue(value) {
 function getConstNumber(node) {
   if (typeof node === 'number') return node;
   if (!node || typeof node !== 'object') return null;
-  if (typeof node.value === 'number') return node.value;
-  if (node.node && typeof node.node === 'object' && typeof node.node.value === 'number') return node.node.value;
+
+  let cursor = node;
+  const visited = new Set();
+  while (cursor && typeof cursor === 'object') {
+    if (visited.has(cursor)) break;
+    visited.add(cursor);
+    if (typeof cursor.value === 'number') return cursor.value;
+    cursor = cursor.node;
+  }
+
   return null;
 }
 
@@ -219,6 +227,10 @@ function applyStandardSurface(material, inputs, issueCollector, nodeName) {
     if (hasNodeValue(transmissionColorNode)) material.transmissionColorNode = transmissionColorNode;
     if (hasNodeValue(inputs.transmission_depth) && isEffectivelyZero(inputs.transmission_depth) === false) {
       material.thicknessNode = inputs.transmission_depth;
+    } else {
+      // Keep transmissive standard_surface materials volumetric when
+      // transmission_depth is omitted or authored as zero.
+      material.thickness = 1;
     }
   }
   if (thinFilmEnabled) {
