@@ -485,7 +485,7 @@ class MaterialXNode {
         node = space === 'world' ? positionWorld : positionLocal;
       } else if (elementName === 'normal') {
         const rawSpace = this.getInputValueByName('space') ?? this.getAttribute('space');
-        const space = normalizeSpaceName(rawSpace, 'world');
+        const space = normalizeSpaceName(rawSpace, 'object');
         node = space === 'world' ? normalWorld : normalLocal;
       } else if (elementName === 'tangent') {
         const rawSpace = this.getInputValueByName('space') ?? this.getAttribute('space');

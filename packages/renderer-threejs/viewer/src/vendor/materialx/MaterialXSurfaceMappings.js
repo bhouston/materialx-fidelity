@@ -1,5 +1,5 @@
 import { DoubleSide } from 'three/webgpu';
-import { float, color, mul, clamp, step, vec2, cos, sin, pow } from 'three/tsl';
+import { float, color, mul, clamp, step, vec2, cos, sin, pow, mix, transformNormalToView } from 'three/tsl';
 
 const mappedStandardSurfaceInputs = new Set([
   'base',
@@ -203,6 +203,13 @@ function applyStandardSurface(material, inputs, issueCollector, nodeName) {
   const thinFilmThicknessNode = inputs.thin_film_thickness;
   const thinFilmIorNode = clamp(inputs.thin_film_ior || inputs.thin_film_IOR || float(1.5), float(1.0), float(2.333));
   const thinFilmEnabled = isEnabledWeightNode(thinFilmThicknessNode);
+  const transmissionTintNode = hasNodeValue(transmissionColorNode) ? transmissionColorNode : color(1, 1, 1);
+
+  if (transmissionEnabled) {
+    const baseForTransmissionMix = colorNode || color(0.8, 0.8, 0.8);
+    // Suppress diffuse/base tint as transmission ramps up.
+    colorNode = mix(baseForTransmissionMix, transmissionTintNode, transmissionNode);
+  }
 
   material.colorNode = colorNode || color(0.8, 0.8, 0.8);
   if (hasNodeValue(opacityNode) && isEffectivelyOne(opacityNode) === false) {
@@ -254,7 +261,7 @@ function applyStandardSurface(material, inputs, issueCollector, nodeName) {
   }
 
   if (clearcoatEnabled && hasNodeValue(inputs.coat_normal)) material.clearcoatNormalNode = inputs.coat_normal;
-  if (hasNodeValue(inputs.normal)) material.normalNode = inputs.normal;
+  if (hasNodeValue(inputs.normal)) material.normalNode = transformNormalToView(inputs.normal);
   if (hasNodeValue(emissiveNode)) material.emissiveNode = emissiveNode;
 
   setTransmissionFlags(material, transmissionNode, opacityNode);
