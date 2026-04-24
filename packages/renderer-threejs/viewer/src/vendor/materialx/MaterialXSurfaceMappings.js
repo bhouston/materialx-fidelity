@@ -265,7 +265,9 @@ function applyStandardSurface(material, inputs, issueCollector, nodeName) {
     }
   }
 
-  if (clearcoatEnabled && hasNodeValue(inputs.coat_normal)) material.clearcoatNormalNode = inputs.coat_normal;
+  if (clearcoatEnabled && hasNodeValue(inputs.coat_normal)) {
+    material.clearcoatNormalNode = transformNormalToView(inputs.coat_normal);
+  }
   if (hasNodeValue(inputs.normal)) material.normalNode = transformNormalToView(inputs.normal);
   if (hasNodeValue(emissiveNode)) material.emissiveNode = emissiveNode;
 
@@ -348,8 +350,10 @@ function applyGltfPbrSurface(material, inputs, issueCollector, nodeName) {
   const anisotropyRotation = inputs.anisotropy_rotation;
   setAnisotropy(material, anisotropyStrength, anisotropyRotation);
 
-  if (hasNodeValue(inputs.normal)) material.normalNode = inputs.normal;
-  if (hasNodeValue(inputs.clearcoat_normal)) material.clearcoatNormalNode = inputs.clearcoat_normal;
+  if (hasNodeValue(inputs.normal)) material.normalNode = transformNormalToView(inputs.normal);
+  if (hasNodeValue(inputs.clearcoat_normal)) {
+    material.clearcoatNormalNode = transformNormalToView(inputs.clearcoat_normal);
+  }
   if (hasNodeValue(inputs.emissive) && hasNodeValue(inputs.emissive_strength))
     material.emissiveNode = mul(inputs.emissive, inputs.emissive_strength);
   else if (hasNodeValue(inputs.emissive)) material.emissiveNode = inputs.emissive;
@@ -396,7 +400,9 @@ function applyOpenPbrSurface(material, inputs, issueCollector, nodeName) {
     if (hasNodeValue(inputs.coat_roughness) && isEffectivelyZero(inputs.coat_roughness) === false) {
       material.clearcoatRoughnessNode = inputs.coat_roughness;
     }
-    if (hasNodeValue(inputs.geometry_coat_normal)) material.clearcoatNormalNode = inputs.geometry_coat_normal;
+    if (hasNodeValue(inputs.geometry_coat_normal)) {
+      material.clearcoatNormalNode = transformNormalToView(inputs.geometry_coat_normal);
+    }
   }
 
   const fuzzWeight = inputs.fuzz_weight || float(0);
@@ -431,7 +437,7 @@ function applyOpenPbrSurface(material, inputs, issueCollector, nodeName) {
   if (hasNodeValue(inputs.geometry_opacity) && isEffectivelyOne(inputs.geometry_opacity) === false) {
     material.opacityNode = inputs.geometry_opacity;
   }
-  if (hasNodeValue(inputs.geometry_normal)) material.normalNode = inputs.geometry_normal;
+  if (hasNodeValue(inputs.geometry_normal)) material.normalNode = transformNormalToView(inputs.geometry_normal);
 
   if (thinFilmEnabled) {
     material.iridescenceNode = inputs.thin_film_weight;
@@ -443,12 +449,10 @@ function applyOpenPbrSurface(material, inputs, issueCollector, nodeName) {
     }
   }
 
-  const emissionColor = inputs.emission_color;
-  const emissionLuminance = inputs.emission_luminance;
-  if (hasNodeValue(emissionColor) && hasNodeValue(emissionLuminance)) {
+  const emissionColor = hasNodeValue(inputs.emission_color) ? inputs.emission_color : color(1, 1, 1);
+  const emissionLuminance = hasNodeValue(inputs.emission_luminance) ? inputs.emission_luminance : float(0);
+  if (isEffectivelyZero(emissionLuminance) === false) {
     material.emissiveNode = mul(emissionColor, emissionLuminance);
-  } else if (hasNodeValue(emissionColor)) {
-    material.emissiveNode = emissionColor;
   }
 
   if (hasNodeValue(inputs.geometry_opacity) && isEffectivelyOne(inputs.geometry_opacity) === false) material.transparent = true;

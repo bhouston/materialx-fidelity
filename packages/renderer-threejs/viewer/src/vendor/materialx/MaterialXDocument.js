@@ -3,6 +3,8 @@ import {
   RepeatWrapping,
   ImageLoader,
   ImageBitmapLoader,
+  Matrix3,
+  Matrix4,
   MeshBasicNodeMaterial,
   MeshPhysicalNodeMaterial,
 } from 'three/webgpu';
@@ -55,7 +57,7 @@ const colorSpaceLib = {
 
 const IDENTITY_MAT3_VALUES = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 const IDENTITY_MAT4_VALUES = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
-const MATRIX_PIVOT_EPSILON = 1e-8;
+const MATRIX_INVERSE_EPSILON = 1e-8;
 const HEXTILE_SQRT3_2 = Math.sqrt(3) * 2;
 const HEXTILE_EPSILON = 1e-6;
 const HEXTILE_PI_OVER_180 = Math.PI / 180;
@@ -186,69 +188,185 @@ function isSvgUri(uri) {
 function invertConstantMatrixValues(values, size) {
   if (!Array.isArray(values) || values.length !== size * size) return null;
 
-  const rowAt = (row, col) => values[row * size + col];
-  const augmented = [];
-
-  for (let row = 0; row < size; row++) {
-    const augRow = [];
-
-    for (let col = 0; col < size; col++) {
-      augRow.push(rowAt(row, col));
-    }
-
-    for (let col = 0; col < size; col++) {
-      augRow.push(row === col ? 1 : 0);
-    }
-
-    augmented.push(augRow);
+  if (size === 3) {
+    const matrix = new Matrix3().set(
+      values[0],
+      values[1],
+      values[2],
+      values[3],
+      values[4],
+      values[5],
+      values[6],
+      values[7],
+      values[8],
+    );
+    if (Math.abs(matrix.determinant()) < MATRIX_INVERSE_EPSILON) return null;
+    matrix.invert();
+    const e = matrix.elements;
+    // Convert Three.js internal column-major storage back to row-major literal order.
+    return [e[0], e[3], e[6], e[1], e[4], e[7], e[2], e[5], e[8]];
   }
 
-  for (let pivotCol = 0; pivotCol < size; pivotCol++) {
-    let pivotRow = pivotCol;
-    let pivotAbs = Math.abs(augmented[pivotRow][pivotCol]);
+  if (size === 4) {
+    const matrix = new Matrix4().set(
+      values[0],
+      values[1],
+      values[2],
+      values[3],
+      values[4],
+      values[5],
+      values[6],
+      values[7],
+      values[8],
+      values[9],
+      values[10],
+      values[11],
+      values[12],
+      values[13],
+      values[14],
+      values[15],
+    );
+    if (Math.abs(matrix.determinant()) < MATRIX_INVERSE_EPSILON) return null;
+    matrix.invert();
+    const e = matrix.elements;
+    // Convert Three.js internal column-major storage back to row-major literal order.
+    return [e[0], e[4], e[8], e[12], e[1], e[5], e[9], e[13], e[2], e[6], e[10], e[14], e[3], e[7], e[11], e[15]];
+  }
 
-    for (let row = pivotCol + 1; row < size; row++) {
-      const valueAbs = Math.abs(augmented[row][pivotCol]);
-      if (valueAbs > pivotAbs) {
-        pivotAbs = valueAbs;
-        pivotRow = row;
+  return null;
+}
+
+function matrixNodeAt(matrixNode, row, col) {
+  return element(element(matrixNode, col), row);
+}
+
+function det2Node(a, b, c, d) {
+  return sub(mul(a, d), mul(b, c));
+}
+
+function det3Node(matrixRows) {
+  const a = matrixRows[0][0];
+  const b = matrixRows[0][1];
+  const c = matrixRows[0][2];
+  const d = matrixRows[1][0];
+  const e = matrixRows[1][1];
+  const f = matrixRows[1][2];
+  const g = matrixRows[2][0];
+  const h = matrixRows[2][1];
+  const i = matrixRows[2][2];
+
+  const eiMinusFh = det2Node(e, f, h, i);
+  const diMinusFg = det2Node(d, f, g, i);
+  const dhMinusEg = det2Node(d, e, g, h);
+
+  return add(sub(mul(a, eiMinusFh), mul(b, diMinusFg)), mul(c, dhMinusEg));
+}
+
+function readMatrixRows(matrixNode, size) {
+  const rows = [];
+  for (let row = 0; row < size; row += 1) {
+    const rowValues = [];
+    for (let col = 0; col < size; col += 1) {
+      rowValues.push(matrixNodeAt(matrixNode, row, col));
+    }
+    rows.push(rowValues);
+  }
+  return rows;
+}
+
+function invertMatrixNode(matrixNode, size) {
+  if (size === 3) {
+    const m = readMatrixRows(matrixNode, 3);
+    const a = m[0][0];
+    const b = m[0][1];
+    const c = m[0][2];
+    const d = m[1][0];
+    const e = m[1][1];
+    const f = m[1][2];
+    const g = m[2][0];
+    const h = m[2][1];
+    const i = m[2][2];
+
+    const determinant = det3Node(m);
+    const invDet = div(1, determinant);
+
+    const cofactor00 = det2Node(e, f, h, i);
+    const cofactor01 = sub(0, det2Node(d, f, g, i));
+    const cofactor02 = det2Node(d, e, g, h);
+    const cofactor10 = sub(0, det2Node(b, c, h, i));
+    const cofactor11 = det2Node(a, c, g, i);
+    const cofactor12 = sub(0, det2Node(a, b, g, h));
+    const cofactor20 = det2Node(b, c, e, f);
+    const cofactor21 = sub(0, det2Node(a, c, d, f));
+    const cofactor22 = det2Node(a, b, d, e);
+
+    return mat3(
+      mul(cofactor00, invDet),
+      mul(cofactor10, invDet),
+      mul(cofactor20, invDet),
+      mul(cofactor01, invDet),
+      mul(cofactor11, invDet),
+      mul(cofactor21, invDet),
+      mul(cofactor02, invDet),
+      mul(cofactor12, invDet),
+      mul(cofactor22, invDet),
+    );
+  }
+
+  if (size === 4) {
+    const m = readMatrixRows(matrixNode, 4);
+    const det3FromMinor = (rowToRemove, colToRemove) => {
+      const minorRows = [];
+      for (let row = 0; row < 4; row += 1) {
+        if (row === rowToRemove) continue;
+        const minorRow = [];
+        for (let col = 0; col < 4; col += 1) {
+          if (col === colToRemove) continue;
+          minorRow.push(m[row][col]);
+        }
+        minorRows.push(minorRow);
       }
-    }
+      return det3Node(minorRows);
+    };
 
-    if (pivotAbs < MATRIX_PIVOT_EPSILON) {
-      return null;
-    }
+    const determinant = add(
+      sub(mul(m[0][0], det3FromMinor(0, 0)), mul(m[0][1], det3FromMinor(0, 1))),
+      add(mul(m[0][2], det3FromMinor(0, 2)), sub(0, mul(m[0][3], det3FromMinor(0, 3)))),
+    );
+    const invDet = div(1, determinant);
 
-    if (pivotRow !== pivotCol) {
-      const temp = augmented[pivotCol];
-      augmented[pivotCol] = augmented[pivotRow];
-      augmented[pivotRow] = temp;
-    }
-
-    const pivot = augmented[pivotCol][pivotCol];
-    for (let col = 0; col < size * 2; col++) {
-      augmented[pivotCol][col] /= pivot;
-    }
-
-    for (let row = 0; row < size; row++) {
-      if (row === pivotCol) continue;
-      const factor = augmented[row][pivotCol];
-      if (factor === 0) continue;
-
-      for (let col = 0; col < size * 2; col++) {
-        augmented[row][col] -= factor * augmented[pivotCol][col];
+    const inverseRows = [];
+    for (let row = 0; row < 4; row += 1) {
+      const inverseRow = [];
+      for (let col = 0; col < 4; col += 1) {
+        const cofactor = det3FromMinor(col, row);
+        const signedCofactor = (col + row) % 2 === 0 ? cofactor : sub(0, cofactor);
+        inverseRow.push(mul(signedCofactor, invDet));
       }
+      inverseRows.push(inverseRow);
     }
+
+    return mat4(
+      inverseRows[0][0],
+      inverseRows[0][1],
+      inverseRows[0][2],
+      inverseRows[0][3],
+      inverseRows[1][0],
+      inverseRows[1][1],
+      inverseRows[1][2],
+      inverseRows[1][3],
+      inverseRows[2][0],
+      inverseRows[2][1],
+      inverseRows[2][2],
+      inverseRows[2][3],
+      inverseRows[3][0],
+      inverseRows[3][1],
+      inverseRows[3][2],
+      inverseRows[3][3],
+    );
   }
 
-  const inverse = [];
-  for (let row = 0; row < size; row++) {
-    for (let col = 0; col < size; col++) {
-      inverse.push(augmented[row][size + col]);
-    }
-  }
-
-  return inverse;
+  return matrixNode;
 }
 
 function getOutputChannel(outputName) {
@@ -257,6 +375,13 @@ function getOutputChannel(outputName) {
   if (outputName === 'outz' || outputName === 'outb' || outputName === 'b') return 2;
   if (outputName === 'outw' || outputName === 'outa' || outputName === 'a') return 3;
   return 0;
+}
+
+function isChannelOutput(outputName) {
+  return outputName === 'outx' || outputName === 'outr' || outputName === 'r' ||
+    outputName === 'outy' || outputName === 'outg' || outputName === 'g' ||
+    outputName === 'outz' || outputName === 'outb' || outputName === 'b' ||
+    outputName === 'outw' || outputName === 'outa' || outputName === 'a';
 }
 
 function normalizeSpaceName(value, fallback = 'world') {
@@ -446,6 +571,7 @@ class MaterialXNode {
     }
 
     const type = this.type;
+    const channelRequested = this.element !== 'input' && isChannelOutput(out);
 
     if (this.isConst) {
       if (type === 'boolean') {
@@ -485,7 +611,7 @@ class MaterialXNode {
         node = space === 'world' ? positionWorld : positionLocal;
       } else if (elementName === 'normal') {
         const rawSpace = this.getInputValueByName('space') ?? this.getAttribute('space');
-        const space = normalizeSpaceName(rawSpace, 'object');
+        const space = normalizeSpaceName(rawSpace, 'world');
         node = space === 'world' ? normalWorld : normalLocal;
       } else if (elementName === 'tangent') {
         const rawSpace = this.getInputValueByName('space') ?? this.getAttribute('space');
@@ -621,7 +747,13 @@ class MaterialXNode {
           }
         } else {
           const inNode = this.getNodeByName('in');
-          node = inNode === undefined || inNode === null ? float(0) : inNode;
+          if (isMatrixType) {
+            const size = matrixType === 'matrix33' ? 3 : 4;
+            const fallback = size === 3 ? mat3(...IDENTITY_MAT3_VALUES) : mat4(...IDENTITY_MAT4_VALUES);
+            node = invertMatrixNode(inNode === undefined || inNode === null ? fallback : inNode, size);
+          } else {
+            node = inNode === undefined || inNode === null ? float(0) : inNode;
+          }
         }
       } else if (MtlXLibrary[elementName] !== undefined) {
         const nodeElement = MtlXLibrary[elementName];
@@ -653,14 +785,19 @@ class MaterialXNode {
       node = float(0);
     }
 
-    if (type === 'boolean') {
+    if (channelRequested) {
+      node = element(node, getOutputChannel(out));
+    }
+
+    const resolvedType = channelRequested ? 'float' : type;
+    if (resolvedType === 'boolean') {
       node = this.toBooleanMaskNode(node);
     } else {
-      const nodeToTypeClass = this.getClassFromType(type);
+      const nodeToTypeClass = this.getClassFromType(resolvedType);
       if (nodeToTypeClass !== null) {
         node = nodeToTypeClass(node);
-      } else if (type !== null && type !== undefined && type !== 'multioutput') {
-        this.materialX.issueCollector.addInvalidValue(this.name, `Unexpected type "${type}" on node "${this.name}".`);
+      } else if (resolvedType !== null && resolvedType !== undefined && resolvedType !== 'multioutput') {
+        this.materialX.issueCollector.addInvalidValue(this.name, `Unexpected type "${resolvedType}" on node "${this.name}".`);
         node = float(0);
       }
     }

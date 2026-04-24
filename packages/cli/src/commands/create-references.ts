@@ -53,7 +53,7 @@ interface RenderLogLine {
 function renderLogLineText(entry: RenderLogLine): string {
   const durationPart = entry.durationText ? ` (${entry.durationText})` : '';
   const errorPart = entry.errorMessage ? ` - ${entry.errorMessage}` : '';
-  return `${entry.rendererName} | ${entry.materialLabel} | ${entry.status}${durationPart}${errorPart}`;
+  return `${entry.materialLabel} | ${entry.rendererName} | ${entry.status}${durationPart}${errorPart}`;
 }
 
 function normalizeRendererNames(rawRenderers: unknown): string[] {
