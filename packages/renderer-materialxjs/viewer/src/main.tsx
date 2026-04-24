@@ -3,7 +3,7 @@ import { createThreeMaterialFromDocument, type TextureResolver } from '@material
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { z } from 'zod';
-import { RepeatWrapping, TextureLoader } from 'three';
+import { ImageBitmapLoader, ImageLoader, LoadingManager, RepeatWrapping } from 'three';
 import * as THREE from 'three/webgpu';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
@@ -90,10 +90,17 @@ function toFsUrlPath(path: string): string {
   return `/@fs/${normalizePath(path)}`;
 }
 
+function isSvgUri(uri: string): boolean {
+  return /\.svg(?:$|[?#])/i.test(uri);
+}
+
 function createBrowserTextureResolver(mtlxPathUrl: string): TextureResolver {
   const materialPath = normalizePath(fromFsUrlPath(mtlxPathUrl));
   const materialDirectory = dirnamePath(materialPath);
-  const loader = new TextureLoader();
+  const manager = new LoadingManager();
+  const imageLoader = new ImageLoader(manager);
+  const bitmapLoader = new ImageBitmapLoader(manager);
+  bitmapLoader.setOptions({ imageOrientation: 'flipY' });
   const cache = new Map<string, THREE.Texture>();
 
   return {
@@ -106,11 +113,24 @@ function createBrowserTextureResolver(mtlxPathUrl: string): TextureResolver {
         return cached;
       }
 
-      const texture = loader.load(resolvedUrl);
+      const svgTexture = isSvgUri(resolvedUrl);
+      const loader = svgTexture ? imageLoader : bitmapLoader;
+      const texture = new THREE.Texture();
       texture.name = resolvedUrl;
       texture.wrapS = RepeatWrapping;
       texture.wrapT = RepeatWrapping;
-      texture.flipY = false;
+      texture.flipY = !svgTexture;
+      loader.load(
+        resolvedUrl,
+        (imageData) => {
+          texture.image = imageData;
+          texture.needsUpdate = true;
+        },
+        undefined,
+        () => {
+          throw new Error(`Failed to load texture "${resolvedUrl}".`);
+        },
+      );
       cache.set(resolvedUrl, texture);
       return texture;
     },
@@ -234,7 +254,7 @@ async function buildScene(): Promise<void> {
     }
   }
   if (unsupportedCategories.size > 0) {
-    const categoryList = [...unsupportedCategories].sort().join(', ');
+    const categoryList = [...unsupportedCategories].toSorted().join(', ');
     throw new Error(`Unsupported MaterialX node categories in materialxjs renderer: ${categoryList}`);
   }
   if (result.warnings.length > 0) {

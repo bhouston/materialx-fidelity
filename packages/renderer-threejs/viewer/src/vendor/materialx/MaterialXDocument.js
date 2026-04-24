@@ -595,6 +595,10 @@ class MaterialXNode {
 
         const colorSpaceNode = file ? file.getColorSpaceNode() : null;
         if (colorSpaceNode) node = colorSpaceNode(node);
+        if (elementName === 'gltf_normalmap') {
+          const normalScale = this.getNodeByName('scale') || float(1);
+          node = normalMap(node, normalScale);
+        }
       } else if (elementName === 'invertmatrix') {
         const inInput = this.getChildByName('in');
         const matrixType = inInput ? inInput.type : null;
