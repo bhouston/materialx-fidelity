@@ -22,6 +22,8 @@ interface RuntimeState {
   server: ViteDevServer;
 }
 
+type MaterialXLoaderVariant = 'custom' | 'official';
+
 const VIEWER_HDR_FILENAME = 'san_giuseppe_bridge_2k.hdr';
 const VIEWER_MODEL_FILENAME = 'ShaderBall.glb';
 const VIEWER_ENVIRONMENT_ROTATION_DEGREES = -90;
@@ -118,15 +120,24 @@ async function launchGpuBrowser(): Promise<Browser> {
 }
 
 class ThreeJsRenderer implements FidelityRenderer {
-  public readonly name = 'threejs';
+  public readonly name: string;
   public readonly version = '0.1.0';
   public readonly category = 'rasterizer';
   public readonly emptyReferenceImagePath: string;
   private readonly thirdPartyRoot: string;
+  private readonly materialXLoaderVariant: MaterialXLoaderVariant;
   private prerequisitesValidated = false;
   private runtimeState: RuntimeState | undefined;
 
-  public constructor(context: RendererContext) {
+  public constructor(
+    context: RendererContext,
+    options: {
+      name: string;
+      materialXLoaderVariant: MaterialXLoaderVariant;
+    },
+  ) {
+    this.name = options.name;
+    this.materialXLoaderVariant = options.materialXLoaderVariant;
     this.thirdPartyRoot = context.thirdPartyRoot;
     const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
     this.emptyReferenceImagePath = join(packageRoot, 'threejs-empty.png');
@@ -167,7 +178,7 @@ class ThreeJsRenderer implements FidelityRenderer {
     if (!this.prerequisitesValidated) {
       const checkResult = await this.checkPrerequisites();
       if (!checkResult.success) {
-        throw new Error(checkResult.message ?? 'Three.js prerequisites are not satisfied.');
+        throw new Error(checkResult.message ?? `${this.name} prerequisites are not satisfied.`);
       }
     }
 
@@ -284,6 +295,7 @@ class ThreeJsRenderer implements FidelityRenderer {
       url.searchParams.set('environmentHdrPath', toFsUrlPath(options.environmentHdrPath));
       url.searchParams.set('environmentRotationDegrees', String(VIEWER_ENVIRONMENT_ROTATION_DEGREES));
       url.searchParams.set('backgroundColor', options.backgroundColor);
+      url.searchParams.set('materialXLoaderVariant', this.materialXLoaderVariant);
 
       await page.goto(url.toString(), { waitUntil: 'networkidle' });
       await Promise.race([
@@ -333,8 +345,22 @@ class ThreeJsRenderer implements FidelityRenderer {
 
 export function createRenderer(context?: RendererContext): FidelityRenderer {
   if (!context) {
-    throw new Error('ThreeJS renderer requires renderer context with thirdPartyRoot.');
+    throw new Error('ThreeJS New renderer requires renderer context with thirdPartyRoot.');
   }
 
-  return new ThreeJsRenderer(context);
+  return new ThreeJsRenderer(context, {
+    name: 'threejs-new',
+    materialXLoaderVariant: 'custom',
+  });
+}
+
+export function createCurrentRenderer(context?: RendererContext): FidelityRenderer {
+  if (!context) {
+    throw new Error('ThreeJS Current renderer requires renderer context with thirdPartyRoot.');
+  }
+
+  return new ThreeJsRenderer(context, {
+    name: 'threejs-current',
+    materialXLoaderVariant: 'official',
+  });
 }

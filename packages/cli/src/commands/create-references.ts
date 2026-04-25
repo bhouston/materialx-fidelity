@@ -5,7 +5,10 @@ import { createReferences } from '@material-fidelity/core';
 import type { CreateReferencesProgressEvent, CreateReferencesResult, FidelityRenderer } from '@material-fidelity/core';
 import { createRenderer as createMaterialXJsRenderer } from '@material-fidelity/renderer-materialxjs';
 import { createRenderer as createMaterialXViewRenderer } from '@material-fidelity/renderer-materialxview';
-import { createRenderer as createThreeJsRenderer } from '@material-fidelity/renderer-threejs';
+import {
+  createCurrentRenderer as createThreeJsCurrentRenderer,
+  createRenderer as createThreeJsNewRenderer,
+} from '@material-fidelity/renderer-threejs';
 import { humanizeTime } from 'humanize-units';
 import { defineCommand } from 'yargs-file-commands';
 
@@ -292,7 +295,8 @@ export const command = defineCommand({
     const renderers: FidelityRenderer[] = [
       createMaterialXJsRenderer({ thirdPartyRoot }),
       createMaterialXViewRenderer(),
-      createThreeJsRenderer({ thirdPartyRoot }),
+      createThreeJsNewRenderer({ thirdPartyRoot }),
+      createThreeJsCurrentRenderer({ thirdPartyRoot }),
     ];
     const startedAt = Date.now();
     const materialSelectors = normalizeStringList(argv.materials);

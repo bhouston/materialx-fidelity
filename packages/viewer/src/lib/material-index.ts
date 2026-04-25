@@ -2,7 +2,10 @@ import { access, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { createRenderer as createMaterialXJsRenderer } from '@material-fidelity/renderer-materialxjs';
 import { createRenderer as createMaterialXViewRenderer } from '@material-fidelity/renderer-materialxview';
-import { createRenderer as createThreeJsRenderer } from '@material-fidelity/renderer-threejs';
+import {
+  createCurrentRenderer as createThreeJsCurrentRenderer,
+  createRenderer as createThreeJsNewRenderer,
+} from '@material-fidelity/renderer-threejs';
 
 const MATERIAL_SOURCE_BASE_URL = 'https://github.com/bhouston/material-samples/tree/main/materials';
 const HOMAGE_VIEWER_BASE_URL = 'https://materialx.ben3d.ca';
@@ -191,7 +194,8 @@ function getBuiltInRenderers(thirdPartyRoot: string): BuiltInRendererDescriptor[
   const renderers = [
     createMaterialXJsRenderer({ thirdPartyRoot }),
     createMaterialXViewRenderer(),
-    createThreeJsRenderer({ thirdPartyRoot }),
+    createThreeJsNewRenderer({ thirdPartyRoot }),
+    createThreeJsCurrentRenderer({ thirdPartyRoot }),
   ];
   return renderers
     .map((renderer) => ({ name: renderer.name, category: renderer.category }))

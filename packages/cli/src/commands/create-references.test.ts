@@ -34,7 +34,15 @@ vi.mock('@material-fidelity/renderer-materialxjs', () => ({
 
 vi.mock('@material-fidelity/renderer-threejs', () => ({
   createRenderer: () => ({
-    name: 'threejs',
+    name: 'threejs-new',
+    version: 'test',
+    checkPrerequisites: async () => ({ success: true }),
+    start: async () => undefined,
+    shutdown: async () => undefined,
+    generateImage: async () => undefined,
+  }),
+  createCurrentRenderer: () => ({
+    name: 'threejs-current',
     version: 'test',
     checkPrerequisites: async () => ({ success: true }),
     start: async () => undefined,
@@ -87,12 +95,12 @@ describe('create-references command', () => {
       concurrency: 2,
     });
     expect(firstCall?.[0].thirdPartyRoot.endsWith('/third_party')).toBe(true);
-    expect(firstCall?.[0].renderers).toHaveLength(3);
+    expect(firstCall?.[0].renderers).toHaveLength(4);
   });
 
   it('passes materials selectors through to core createReferences', async () => {
     await command.handler({
-      renderers: ['materialxview,threejs'],
+      renderers: ['materialxview,threejs-new'],
       materials: ['standard_surface', '/gltf_pbr/i'],
       filter: 'stdlib',
       concurrency: 1,
@@ -103,7 +111,7 @@ describe('create-references command', () => {
     const [firstCall] = createReferencesMock.mock.calls;
     expect(firstCall).toBeDefined();
     expect(firstCall?.[0]).toMatchObject({
-      rendererNames: ['materialxview', 'threejs'],
+      rendererNames: ['materialxview', 'threejs-new'],
       materialSelectors: ['standard_surface', '/gltf_pbr/i', 'stdlib'],
     });
   });

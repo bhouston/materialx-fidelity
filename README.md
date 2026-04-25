@@ -56,7 +56,8 @@ Currently supported renderers:
 
 - `materialxjs` (`@material-fidelity/renderer-materialxjs`)
 - `materialxview` (`@material-fidelity/renderer-materialxview`)
-- `threejs` (`@material-fidelity/renderer-threejs`)
+- `threejs-new` (`@material-fidelity/renderer-threejs`, custom MaterialX support proposal)
+- `threejs-current` (`@material-fidelity/renderer-threejs`, official npm Three.js MaterialX support)
 
 Optional flags:
 
@@ -134,7 +135,7 @@ Coverage and rename artifacts:
 
 ## Reference Renderer Setup
 
-To keep reference renders visually comparable between `materialxview` and `threejs`, both renderers should follow this framing setup:
+To keep reference renders visually comparable between `materialxview`, `threejs-new`, and `threejs-current`, these renderers should follow this framing setup:
 
 - camera: perspective, FOV `45`, near `0.05`, eye `(0,0,5)`, look target `(0,0,0)`
 - model normalization: center the loaded `ShaderBall.glb` at the origin, then scale it so the bounding-box sphere radius is `2.0` (matching `MaterialXView`'s `IDEAL_MESH_SPHERE_RADIUS`)
@@ -154,7 +155,7 @@ Run the MaterialX Fidelity Viewer:
 pnpm viewer
 ```
 
-The viewer scans MaterialX materials and looks for images for the built-in renderer list (`materialxjs`, `materialxview`, `threejs`).
+The viewer scans MaterialX materials and looks for images for the built-in renderer list (`materialxjs`, `materialxview`, `threejs-current`, `threejs-new`).
 
 The page groups materials by purpose/type (`showcase`, `nodes`, `open_pbr_surface`, `gltf_pbr`, `standard_surface`) and displays each renderer image (`<renderer>.png`) side by side. Missing images render as a placeholder tile.
 

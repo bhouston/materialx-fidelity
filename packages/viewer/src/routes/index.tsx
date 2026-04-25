@@ -271,7 +271,8 @@ function App() {
               >
                 @material-fidelity/renderer-threejs
               </a>{' '}
-              - Uses the MaterialXLoader from the{' '}
+              - Includes both `threejs-new` (custom MaterialXLoader proposal) and `threejs-current` (official Three.js
+              MaterialXLoader from npm) using the{' '}
               <a
                 className="underline underline-offset-2 hover:no-underline"
                 href="https://threejs.org/"

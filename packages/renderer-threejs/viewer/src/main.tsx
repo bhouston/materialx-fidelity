@@ -4,7 +4,8 @@ import { z } from 'zod';
 import * as THREE from 'three/webgpu';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
-import { MaterialXLoader } from './vendor/MaterialXLoader.js';
+import { MaterialXLoader as ThreeMaterialXLoader } from 'three/addons/loaders/MaterialXLoader.js';
+import { MaterialXLoader as CustomMaterialXLoader } from './vendor/MaterialXLoader.js';
 
 declare global {
   var __MTLX_CAPTURE_DONE__: boolean | undefined;
@@ -30,12 +31,28 @@ const querySchema = z.object({
 
     return [pieces[0], pieces[1], pieces[2]] as const;
   }),
+  materialXLoaderVariant: z.enum(['custom', 'official']).default('custom'),
 });
 
 type ViewerQuery = z.infer<typeof querySchema>;
 const IDEAL_MESH_SPHERE_RADIUS = 2;
 const REFERENCE_IMAGE_WIDTH = 512;
 const REFERENCE_IMAGE_HEIGHT = 512;
+
+type ThreeMaterialXLoaderResult = {
+  materials?: Record<string, THREE.Material>;
+  material?: THREE.Material;
+  report?: {
+    warnings?: unknown[];
+  };
+};
+
+type MaterialXLoaderLike = {
+  setPath: (path: string) => MaterialXLoaderLike;
+  loadAsync: (path: string) => Promise<ThreeMaterialXLoaderResult>;
+  dispose?: () => void;
+  setIssuePolicy?: (policy: string) => MaterialXLoaderLike;
+};
 
 function logMaterialXWarnings(candidate: unknown): void {
   if (!candidate || typeof candidate !== 'object') {
@@ -202,7 +219,7 @@ async function buildScene(): Promise<void> {
   let rendererForCleanup: THREE.WebGPURenderer | undefined;
   let environmentTextureForCleanup: THREE.Texture | undefined;
   let modelForCleanup: THREE.Object3D | undefined;
-  let materialXLoaderForCleanup: MaterialXLoader | undefined;
+  let materialXLoaderForCleanup: MaterialXLoaderLike | undefined;
   globalThis.__MTLX_DISPOSE_SCENE__ = () => {
     materialXLoaderForCleanup?.dispose?.();
     if (modelForCleanup) {
@@ -258,7 +275,10 @@ async function buildScene(): Promise<void> {
   scene.add(gltf.scene);
 
   const materialXPath = splitPath(query.mtlxPath);
-  const materialXLoader = new MaterialXLoader().setPath(materialXPath.basePath).setIssuePolicy('error-core');
+  const materialXLoader: MaterialXLoaderLike =
+    query.materialXLoaderVariant === 'official' ? new ThreeMaterialXLoader() : new CustomMaterialXLoader();
+  materialXLoader.setPath(materialXPath.basePath);
+  materialXLoader.setIssuePolicy?.('error-core');
   materialXLoaderForCleanup = materialXLoader;
   const materialXResult = await materialXLoader.loadAsync(materialXPath.fileName);
   logMaterialXWarnings(materialXResult);
