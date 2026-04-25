@@ -587,10 +587,16 @@ class MaterialXNode {
       }
     } else if (this.hasReference) {
       if (this.element === 'output' && this.output && out === null) out = this.output;
+      let requestedOutput = out;
+      // For nodegraph references, this input's `output` attribute selects the graph output
+      // itself and should not be forwarded as an output selector on the resolved node.
+      if (this.element === 'input' && this.nodeGraph !== null && this.output !== null) {
+        requestedOutput = null;
+      }
       const referenceNode = this.materialX.getMaterialXNode(this.referencePath);
 
       if (referenceNode) {
-        node = referenceNode.getNode(out);
+        node = referenceNode.getNode(requestedOutput);
       } else {
         this.materialX.issueCollector.addMissingReference(this.name, this.referencePath);
         node = float(0);

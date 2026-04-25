@@ -22,6 +22,7 @@ import {
   sub,
   mix,
   dot,
+  normalize,
   mx_atan2,
 } from 'three/tsl';
 import { normalizeSpaceName } from '../MaterialXUtils.js';
@@ -293,7 +294,7 @@ function createMaterialXCompileRegistry() {
   register(registry, ['convert'], (nodeX) => compileConvertNode(nodeX));
   register(registry, ['constant'], (nodeX) => compileConstantNode(nodeX));
   register(registry, ['position'], (nodeX) => compileSpaceInputNode(nodeX, positionLocal, positionWorld));
-  register(registry, ['normal'], (nodeX) => compileSpaceInputNode(nodeX, normalLocal, normalWorld));
+  register(registry, ['normal'], (nodeX) => normalize(compileSpaceInputNode(nodeX, normalLocal, normalWorld)));
   register(registry, ['tangent'], (nodeX) => compileSpaceInputNode(nodeX, tangentLocal, tangentWorld));
   register(registry, ['texcoord'], (nodeX, out, compileContext) => compileTexcoordNode(nodeX, compileContext));
   register(registry, ['geomcolor'], (nodeX) => compileGeomColorNode(nodeX));
