@@ -9,6 +9,21 @@ This note defines the expected contribution quality bar when preparing `renderer
 - Preserve current behavior parity with `third_party/material-viewer` for supported nodes/surfaces unless a deliberate divergence is documented in PR notes.
 - Unsupported or partially supported features must emit structured issues through `MaterialXIssueCollector` rather than silently failing.
 
+## Loader API Contract
+
+Public loader import path:
+
+- `@material-fidelity/renderer-threejs/loader`
+
+Expected API behavior:
+
+- `load(url, onLoad, onProgress?, onError?)`: callback-based loading compatible with Three.js loader conventions.
+- `loadAsync(url, onProgress?)`: Promise wrapper over `load` with equivalent parse/error behavior.
+- `setPath(path)`: inherited `Loader` path prefix behavior for relative MaterialX and texture URIs.
+- `setIssuePolicy(policy)`: strictness profile (`warn`, `error-core`, `error-all`).
+- `setUnsupportedPolicy('error')`: legacy alias that maps to `error-core`.
+- `setMaterialName(name)`: optional surfacematerial selection.
+
 ## Supported Surface Families
 
 Current surface mapping registry in `MaterialXSurfaceRegistry.js` includes:
@@ -48,6 +63,35 @@ pnpm --filter @material-fidelity/renderer-threejs validate:node-registry
 ```
 
 Use `MATERIALX_LIBRARIES_DIR` to override source libraries path when needed.
+
+Default source path expectation (when override is unset):
+
+- `../MaterialX/libraries` relative to repository root.
+
+Contributors without that checkout should always set `MATERIALX_LIBRARIES_DIR`.
+
+## Runtime and Memory Lifecycle Expectations
+
+- Archive-backed `.mtlx.zip` loads must revoke object URLs via resolver disposal.
+- Scene/runtime capture path must dispose renderer + scene resources after each render.
+- Translator texture dedupe cache remains unbounded by design for parity with legacy behavior.
+- Missing references should report through issue collector (not crash via unresolved node dereference).
+
+## Reviewer Test Matrix (Minimal)
+
+For every upstream PR touching loader/translator behavior, include at least:
+
+1. Loader API smoke:
+   - callback `load` succeeds/fails as expected
+   - Promise `loadAsync` resolves/rejects as expected
+2. Strictness integration:
+   - unsupported node and missing reference behavior under `warn` and `error-core`
+   - ignored surface input behavior under `warn`, `error-core`, `error-all`
+   - missing material behavior under `warn` and `error-all`
+3. Lifecycle:
+   - archive resolver `dispose()` revokes object URLs
+4. Registry:
+   - compile/surface category coverage validation remains in sync with generated categories
 
 ## Upstream PR Validation Checklist
 

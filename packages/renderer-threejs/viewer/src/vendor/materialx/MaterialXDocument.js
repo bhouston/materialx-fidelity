@@ -33,7 +33,6 @@ import {
   color,
   dFdx,
   dFdy,
-  texture,
   uv,
   mat3,
   mat4,
@@ -723,11 +722,11 @@ class MaterialXNode {
 
   resolveSurfaceShaderNode(nodeX) {
     if (nodeX.hasReference) {
-      return this.materialX.getMaterialXNode(nodeX.referencePath);
+      return this.materialX.getMaterialXNode(nodeX.referencePath) || null;
     }
 
     if (nodeX.nodeName) {
-      return this.materialX.getMaterialXNode(nodeX.nodeName);
+      return this.materialX.getMaterialXNode(nodeX.nodeName) || null;
     }
 
     return null;

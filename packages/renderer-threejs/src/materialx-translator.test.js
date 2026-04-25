@@ -1,4 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { FileLoader } from 'three/webgpu';
+import { XMLParser } from 'fast-xml-parser';
 import { createMaterialXCompileRegistry } from '../viewer/src/vendor/materialx/compile/MaterialXCompileRegistry.js';
 import { validateCategoryCoverage } from '../viewer/src/vendor/materialx/MaterialXNodeRegistry.js';
 import { getSupportedSurfaceCategories, surfaceMapperRegistry } from '../viewer/src/vendor/materialx/MaterialXSurfaceRegistry.js';
@@ -7,7 +9,63 @@ import { ISSUE_POLICIES, MaterialXIssueCollector } from '../viewer/src/vendor/ma
 import { createArchiveResolver } from '../viewer/src/vendor/materialx/MaterialXArchive.js';
 import { MaterialXLoader } from '../viewer/src/vendor/MaterialXLoader.js';
 
+function createDomLikeNode(nodeName, nodeValue) {
+  const attributes = {};
+  const children = [];
+
+  for (const [key, value] of Object.entries(nodeValue || {})) {
+    if (key.startsWith('@_')) {
+      attributes[key.slice(2)] = value;
+      continue;
+    }
+    const childNodes = Array.isArray(value) ? value : [value];
+    for (const childNodeValue of childNodes) {
+      if (childNodeValue === null || typeof childNodeValue !== 'object') continue;
+      children.push(createDomLikeNode(key, childNodeValue));
+    }
+  }
+
+  return {
+    nodeName,
+    children,
+    getAttribute(name) {
+      return attributes[name] ?? null;
+    },
+  };
+}
+
+function createDomLikeDocument(text) {
+  const xmlParser = new XMLParser({
+    ignoreAttributes: false,
+    attributeNamePrefix: '@_',
+    parseTagValue: false,
+    trimValues: false,
+  });
+  const parsedTree = xmlParser.parse(text);
+  const rootNodeName = Object.keys(parsedTree).find((key) => key !== '?xml');
+  if (!rootNodeName) {
+    throw new Error('DOMParser mock could not locate a root XML element.');
+  }
+  return {
+    documentElement: createDomLikeNode(rootNodeName, parsedTree[rootNodeName]),
+  };
+}
+
 describe('materialx translator contracts', () => {
+  const originalDOMParser = globalThis.DOMParser;
+
+  beforeAll(() => {
+    globalThis.DOMParser = class DOMParserMock {
+      parseFromString(text) {
+        return createDomLikeDocument(text);
+      }
+    };
+  });
+
+  afterAll(() => {
+    globalThis.DOMParser = originalDOMParser;
+  });
+
   it('builds a stable compile registry', () => {
     const registry = createMaterialXCompileRegistry();
     expect(registry.has('image')).toBe(true);
@@ -98,6 +156,123 @@ describe('materialx translator contracts', () => {
     expect(loader.issuePolicy).toBe('error-all');
     loader.setUnsupportedPolicy('error');
     expect(loader.issuePolicy).toBe('error-core');
+  });
+
+  it('keeps callback load API behavior intact', () => {
+    const setPathSpy = vi.spyOn(FileLoader.prototype, 'setPath').mockReturnThis();
+    const setResponseTypeSpy = vi.spyOn(FileLoader.prototype, 'setResponseType').mockReturnThis();
+    const fileLoadSpy = vi.spyOn(FileLoader.prototype, 'load').mockImplementation(function (url, onLoad) {
+      onLoad('xml payload');
+      return this;
+    });
+    const loader = new MaterialXLoader().setPath('/assets/');
+    const parseBufferSpy = vi.spyOn(loader, 'parseBuffer').mockReturnValue({ parsed: true });
+    const onLoad = vi.fn();
+
+    try {
+      loader.load('material.mtlx', onLoad);
+      expect(setPathSpy).toHaveBeenCalledWith('/assets/');
+      expect(setResponseTypeSpy).toHaveBeenCalledWith('arraybuffer');
+      expect(fileLoadSpy).toHaveBeenCalledWith('material.mtlx', expect.any(Function), undefined, expect.any(Function));
+      expect(parseBufferSpy).toHaveBeenCalledWith('xml payload', 'material.mtlx');
+      expect(onLoad).toHaveBeenCalledWith({ parsed: true });
+    } finally {
+      setPathSpy.mockRestore();
+      setResponseTypeSpy.mockRestore();
+      fileLoadSpy.mockRestore();
+    }
+  });
+
+  it('supports loadAsync and propagates load errors', async () => {
+    const loader = new MaterialXLoader();
+    const loadSpy = vi.spyOn(loader, 'load');
+    const resolvedMaterial = { material: true };
+    loadSpy.mockImplementationOnce((url, onLoad) => {
+      onLoad(resolvedMaterial);
+      return loader;
+    });
+    await expect(loader.loadAsync('ok.mtlx')).resolves.toBe(resolvedMaterial);
+
+    const loadFailure = new Error('load failed');
+    loadSpy.mockImplementationOnce((url, onLoad, onProgress, onError) => {
+      onError(loadFailure);
+      return loader;
+    });
+    await expect(loader.loadAsync('broken.mtlx')).rejects.toThrow('load failed');
+  });
+
+  it('applies strictness policies to unsupported nodes and missing references in real parse flow', () => {
+    const unsupportedSurfaceMtlx = `<?xml version="1.0"?>
+<materialx version="1.38">
+  <future_surface name="future_surface_1" />
+  <surfacematerial name="mat_unsupported">
+    <input name="surfaceshader" nodename="future_surface_1" />
+  </surfacematerial>
+</materialx>`;
+
+    const missingReferenceMtlx = `<?xml version="1.0"?>
+<materialx version="1.38">
+  <surfacematerial name="mat_missing_ref">
+    <input name="surfaceshader" nodename="does_not_exist" />
+  </surfacematerial>
+</materialx>`;
+
+    const warnLoader = new MaterialXLoader().setIssuePolicy(ISSUE_POLICIES.WARN);
+    const unsupportedWarnResult = warnLoader.parseBuffer(unsupportedSurfaceMtlx, 'unsupported.mtlx');
+    expect(unsupportedWarnResult.report.issues).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'unsupported-node', category: 'future_surface' })]),
+    );
+
+    const missingWarnResult = warnLoader.parseBuffer(missingReferenceMtlx, 'missing-ref.mtlx');
+    expect(missingWarnResult.report.issues).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'missing-reference', nodeName: 'surfaceshader' })]),
+    );
+
+    const strictLoader = new MaterialXLoader().setIssuePolicy(ISSUE_POLICIES.ERROR_CORE);
+    expect(() => strictLoader.parseBuffer(unsupportedSurfaceMtlx, 'unsupported.mtlx')).toThrow(/unsupported node categories/i);
+    expect(() => strictLoader.parseBuffer(missingReferenceMtlx, 'missing-ref.mtlx')).toThrow(/missing references/i);
+  });
+
+  it('treats ignored mapped surface inputs as fatal only in error-all parse flow', () => {
+    const ignoredInputMtlx = `<?xml version="1.0"?>
+<materialx version="1.38">
+  <standard_surface name="std_surface">
+    <input name="base" value="0.4" />
+    <input name="future_input" value="1.0" />
+  </standard_surface>
+  <surfacematerial name="mat_std">
+    <input name="surfaceshader" nodename="std_surface" />
+  </surfacematerial>
+</materialx>`;
+
+    const warnLoader = new MaterialXLoader().setIssuePolicy(ISSUE_POLICIES.WARN);
+    const warnResult = warnLoader.parseBuffer(ignoredInputMtlx, 'ignored-input.mtlx');
+    expect(warnResult.report.issues).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'ignored-surface-input', category: 'standard_surface' })]),
+    );
+
+    const strictCoreLoader = new MaterialXLoader().setIssuePolicy(ISSUE_POLICIES.ERROR_CORE);
+    expect(() => strictCoreLoader.parseBuffer(ignoredInputMtlx, 'ignored-input.mtlx')).not.toThrow();
+
+    const strictAllLoader = new MaterialXLoader().setIssuePolicy(ISSUE_POLICIES.ERROR_ALL);
+    expect(() => strictAllLoader.parseBuffer(ignoredInputMtlx, 'ignored-input.mtlx')).toThrow(/ignored surface inputs/i);
+  });
+
+  it('supports missing material failure path via loader-level materialName selection', () => {
+    const materialMtlx = `<?xml version="1.0"?>
+<materialx version="1.38">
+  <standard_surface name="std_surface" />
+  <surfacematerial name="mat_present">
+    <input name="surfaceshader" nodename="std_surface" />
+  </surfacematerial>
+</materialx>`;
+
+    const warnLoader = new MaterialXLoader().setMaterialName('mat_missing').setIssuePolicy(ISSUE_POLICIES.WARN);
+    const warnResult = warnLoader.parseBuffer(materialMtlx, 'missing-material.mtlx');
+    expect(warnResult.report.issues).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'missing-material' })]));
+
+    const strictAllLoader = new MaterialXLoader().setMaterialName('mat_missing').setIssuePolicy(ISSUE_POLICIES.ERROR_ALL);
+    expect(() => strictAllLoader.parseBuffer(materialMtlx, 'missing-material.mtlx')).toThrow(/missing materials/i);
   });
 
   it('treats ignored surface inputs as fatal only in error-all mode', () => {

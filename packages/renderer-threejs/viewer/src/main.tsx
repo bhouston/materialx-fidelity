@@ -260,12 +260,7 @@ async function buildScene(): Promise<void> {
   const materialXPath = splitPath(query.mtlxPath);
   const materialXLoader = new MaterialXLoader().setPath(materialXPath.basePath).setIssuePolicy('error-core');
   materialXLoaderForCleanup = materialXLoader;
-  const materialXResult =
-    typeof materialXLoader.loadAsync === 'function'
-      ? await materialXLoader.loadAsync(materialXPath.fileName)
-      : await new Promise((resolve, reject) => {
-          materialXLoader.load(materialXPath.fileName, resolve, undefined, reject);
-        });
+  const materialXResult = await materialXLoader.loadAsync(materialXPath.fileName);
   logMaterialXWarnings(materialXResult);
 
   const resolvedMaterial = firstMaterial(materialXResult);

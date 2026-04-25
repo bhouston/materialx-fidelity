@@ -74,6 +74,12 @@ class MaterialXLoader extends Loader {
     return this;
   }
 
+  loadAsync(url, onProgress) {
+    return new Promise((resolve, reject) => {
+      this.load(url, resolve, onProgress, reject);
+    });
+  }
+
   parseBuffer(data, url = '') {
     this.clearArchiveResources();
 

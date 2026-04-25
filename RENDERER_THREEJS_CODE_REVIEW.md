@@ -18,6 +18,22 @@ The translator is functionally ambitious and already handles a large MaterialX s
 
 Overall design grade: **B- for functionality, C for maintainability/testability**.
 
+## Status Update (Apr 2026)
+
+The most recent refactor wave addressed several previously high-priority concerns:
+
+- Translator internals now use explicit parse/compile/surface registry layers with generated category validation at startup.
+- Strictness policy has expanded from legacy unsupported-only behavior to `warn`, `error-core`, and `error-all`.
+- Archive lifecycle disposal is implemented (`createArchiveResolver().dispose()` path is wired through loader disposal).
+- Runtime scene teardown is implemented in capture flow (`__MTLX_DISPOSE_SCENE__` cleanup).
+- Translator contract coverage now includes loader async API behavior, strictness integration fixtures, and cache lifecycle checks.
+
+Remaining top risks before upstream submission are now concentrated in:
+
+- `MaterialXDocument.js` still being a large mixed-responsibility module.
+- Ongoing parity/process discipline while `material-viewer` remains a temporary reference.
+- Clear packaging narrative so upstream reviewers see loader runtime concerns separated from fidelity harness concerns.
+
 ## Strengths
 
 - Good end-to-end rendering harness in `src/index.ts` with strong capture determinism (fixed viewport, post-idle passes, and browser console/page error capture).

@@ -2,6 +2,16 @@
   "name": "@material-fidelity/renderer-threejs",
   "version": "0.1.0",
   "source": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./loader": {
+      "types": "./dist/loader/index.d.ts",
+      "import": "./dist/loader/index.js"
+    }
+  },
   "files": [
     "dist",
     "viewer"
