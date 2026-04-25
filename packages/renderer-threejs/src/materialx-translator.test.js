@@ -3,6 +3,7 @@ import { FileLoader } from 'three/webgpu';
 import { XMLParser } from 'fast-xml-parser';
 import { createMaterialXCompileRegistry } from '../viewer/src/vendor/materialx/compile/MaterialXCompileRegistry.js';
 import { validateCategoryCoverage } from '../viewer/src/vendor/materialx/MaterialXNodeRegistry.js';
+import { MtlXLibrary } from '../viewer/src/vendor/materialx/MaterialXNodeLibrary.js';
 import { getSupportedSurfaceCategories, surfaceMapperRegistry } from '../viewer/src/vendor/materialx/MaterialXSurfaceRegistry.js';
 import { parseMaterialXNodeTree } from '../viewer/src/vendor/materialx/parse/MaterialXParser.js';
 import { ISSUE_POLICIES, MaterialXIssueCollector } from '../viewer/src/vendor/materialx/MaterialXWarnings.js';
@@ -75,6 +76,13 @@ describe('materialx translator contracts', () => {
     expect(registry.has('separate3')).toBe(false);
     expect(registry.has('separate4')).toBe(false);
     expect(registry.has('open_pbr_surface')).toBe(false);
+  });
+
+  it('maps cellnoise3d input to position semantics', () => {
+    const cellnoise3d = MtlXLibrary.cellnoise3d;
+    expect(cellnoise3d).toBeDefined();
+    expect(cellnoise3d.params).toEqual(['position']);
+    expect(typeof cellnoise3d.defaults.position).toBe('function');
   });
 
   it('builds a typed surface registry', () => {

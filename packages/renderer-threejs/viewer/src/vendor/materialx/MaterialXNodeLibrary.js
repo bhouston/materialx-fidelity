@@ -779,7 +779,7 @@ const MXElements = [
     amplitude: defaultFloat(1.0),
   }),
   new MXElement('cellnoise2d', mx_cell_noise_float, ['texcoord'], { texcoord: defaultVec2(0, 0) }),
-  new MXElement('cellnoise3d', mx_cell_noise_float, ['texcoord'], { texcoord: defaultVec3(0, 0, 0) }),
+  new MXElement('cellnoise3d', mx_cell_noise_float, ['position'], { position: () => positionLocal }),
   new MXElement('worleynoise2d', mx_worley_noise_float, ['texcoord', 'jitter'], {
     texcoord: defaultVec2(0, 0),
     jitter: defaultFloat(1),
