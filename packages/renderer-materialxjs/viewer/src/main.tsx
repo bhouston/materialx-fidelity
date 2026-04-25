@@ -138,7 +138,27 @@ function createBrowserTextureResolver(mtlxPathUrl: string): TextureResolver {
 }
 
 function recenterAndNormalizeModel(model: THREE.Object3D): void {
+  // First, bake the GLTF node hierarchy into the geometry to match MaterialXView's "Object Space"
   model.updateMatrixWorld(true);
+  model.traverse((node: THREE.Object3D) => {
+    const mesh = node as THREE.Mesh;
+    if (mesh.isMesh && mesh.geometry) {
+      mesh.geometry.applyMatrix4(mesh.matrixWorld);
+    }
+  });
+
+  // Reset the hierarchy matrices since they are now baked
+  model.traverse((node: THREE.Object3D) => {
+    node.position.set(0, 0, 0);
+    node.rotation.set(0, 0, 0);
+    node.scale.set(1, 1, 1);
+    node.quaternion.identity();
+    node.updateMatrix();
+  });
+  model.updateMatrixWorld(true);
+
+  // Now, apply the centering and scaling as a root transform
+  // This matches MaterialXView's "World Space" matrix
   const box = new THREE.Box3().setFromObject(model);
   if (box.isEmpty()) {
     return;

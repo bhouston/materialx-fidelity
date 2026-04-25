@@ -95,11 +95,26 @@ class MaterialXIssueCollector {
   throwIfNeeded() {
     if (this.unsupportedPolicy !== 'error') return;
     const unsupportedNodes = this.issues.filter((issue) => issue.code === ISSUE_CODES.UNSUPPORTED_NODE);
-    if (unsupportedNodes.length === 0) return;
-    const categoryList = [...new Set(unsupportedNodes.map((issue) => issue.category).filter(Boolean))].sort().join(', ');
-    throw new Error(
-      `THREE.MaterialXLoader: Unsupported MaterialX node category detected${categoryList ? `: ${categoryList}` : '.'}`,
-    );
+    const missingReferences = this.issues.filter((issue) => issue.code === ISSUE_CODES.MISSING_REFERENCE);
+    const invalidValues = this.issues.filter((issue) => issue.code === ISSUE_CODES.INVALID_VALUE);
+
+    if (unsupportedNodes.length === 0 && missingReferences.length === 0 && invalidValues.length === 0) return;
+
+    const details = [];
+    if (unsupportedNodes.length > 0) {
+      const categoryList = [...new Set(unsupportedNodes.map((issue) => issue.category).filter(Boolean))].sort().join(', ');
+      details.push(
+        `unsupported node categories${categoryList ? `: ${categoryList}` : ''} (${unsupportedNodes.length})`,
+      );
+    }
+    if (missingReferences.length > 0) {
+      details.push(`missing references (${missingReferences.length})`);
+    }
+    if (invalidValues.length > 0) {
+      details.push(`invalid values (${invalidValues.length})`);
+    }
+
+    throw new Error(`THREE.MaterialXLoader: MaterialX translation failed in error mode; ${details.join('; ')}.`);
   }
 }
 

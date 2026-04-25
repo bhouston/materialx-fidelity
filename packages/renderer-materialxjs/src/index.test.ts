@@ -66,6 +66,10 @@ describe('materialxjs renderer', () => {
       evaluate: vi.fn<() => Promise<void>>(async () => undefined),
       screenshot: vi.fn<() => Promise<void>>(async () => undefined),
       close: vi.fn<() => Promise<void>>(async () => undefined),
+      on: vi.fn<() => void>(() => undefined),
+      off: vi.fn<() => void>(() => undefined),
+      route: vi.fn<() => Promise<void>>(async () => undefined),
+      waitForTimeout: vi.fn<() => Promise<void>>(async () => undefined),
     };
     const secondPage = {
       setViewportSize: vi.fn<() => Promise<void>>(async () => undefined),
@@ -74,6 +78,10 @@ describe('materialxjs renderer', () => {
       evaluate: vi.fn<() => Promise<void>>(async () => undefined),
       screenshot: vi.fn<() => Promise<void>>(async () => undefined),
       close: vi.fn<() => Promise<void>>(async () => undefined),
+      on: vi.fn<() => void>(() => undefined),
+      off: vi.fn<() => void>(() => undefined),
+      route: vi.fn<() => Promise<void>>(async () => undefined),
+      waitForTimeout: vi.fn<() => Promise<void>>(async () => undefined),
     };
 
     let pageCallCount = 0;

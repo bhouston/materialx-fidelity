@@ -73,6 +73,7 @@ import {
   sub,
   step,
 } from 'three/tsl';
+import { normalizeSpaceName } from './MaterialXUtils.js';
 
 class MXElement {
   constructor(name, nodeFunc, params = [], defaults = {}) {
@@ -91,6 +92,18 @@ const mx_range = (inNode, inLow, inHigh, outLow, outHigh, gamma = 1) => {
   const reciprocalGamma = div(1, gamma);
   const gammaApplied = mul(pow(abs(normalized), reciprocalGamma), sign(normalized));
   return add(outLow, mul(gammaApplied, sub(outHigh, outLow)));
+};
+
+const mx_open_pbr_anisotropy = (roughness = 0, anisotropy = 0) => {
+  const anisoInvert = sub(float(1), anisotropy);
+  const anisoInvertSq = mul(anisoInvert, anisoInvert);
+  const denom = add(anisoInvertSq, float(1));
+  const fraction = div(float(2), denom);
+  const sqrtFraction = sqrt(fraction);
+  const roughSq = mul(roughness, roughness);
+  const alphaX = mul(roughSq, sqrtFraction);
+  const alphaY = mul(anisoInvert, alphaX);
+  return vec2(alphaX, alphaY);
 };
 
 const mx_and = (in1, in2) => clamp(mul(in1, in2), float(0), float(1));
@@ -210,15 +223,6 @@ const mx_overlay = (fg, bg, mixval = 1) => {
   return mix(bg, overlayed, mixval);
 };
 const mx_mod = (in1, in2) => sub(in1, mul(in2, floor(div(in1, in2))));
-
-const normalizeSpaceName = (value, fallback = 'world') => {
-  if (typeof value !== 'string') return fallback;
-  const normalized = value.trim().toLowerCase();
-  if (normalized === '') return fallback;
-  if (normalized === 'world') return 'world';
-  if (normalized === 'object' || normalized === 'model') return 'object';
-  return fallback;
-};
 
 const mx_transformnormal = (inNode = vec3(0, 0, 1), fromspace = 'world', tospace = 'world') => {
   const from = normalizeSpaceName(fromspace, 'world');
@@ -349,7 +353,7 @@ const mx_place2d_materialx = (texcoord, pivot = vec2(0, 0), scale = vec2(1, 1), 
   if (typeof operationorder === 'number') {
     return Math.abs(operationorder) > Number.EPSILON ? trs : srt;
   }
-  return mix(srt, trs, step(0.5, operationorder));
+  return mix(srt, trs, step(0.5, float(operationorder)));
 };
 
 const mx_rotate3d_materialx = (inNode, amount = 0, axis = vec3(0, 1, 0)) => {
@@ -584,6 +588,10 @@ const MXElements = [
     outlow: defaultFloat(0),
     outhigh: defaultFloat(1),
     gamma: defaultFloat(1),
+  }),
+  new MXElement('open_pbr_anisotropy', mx_open_pbr_anisotropy, ['roughness', 'anisotropy'], {
+    roughness: defaultFloat(0),
+    anisotropy: defaultFloat(0),
   }),
   new MXElement('smoothstep', mx_smoothstep_materialx, ['in', 'low', 'high'], {
     in: defaultFloat(0),
@@ -903,27 +911,4 @@ for (const entry of MXElements) {
   MtlXLibrary[entry.name] = entry;
 }
 
-const SUPPORTED_NODE_CATEGORIES = new Set(MXElements.map((entry) => entry.name));
-SUPPORTED_NODE_CATEGORIES.add('surfacematerial');
-SUPPORTED_NODE_CATEGORIES.add('standard_surface');
-SUPPORTED_NODE_CATEGORIES.add('open_pbr_surface');
-SUPPORTED_NODE_CATEGORIES.add('gltf_pbr');
-SUPPORTED_NODE_CATEGORIES.add('nodegraph');
-SUPPORTED_NODE_CATEGORIES.add('output');
-SUPPORTED_NODE_CATEGORIES.add('input');
-SUPPORTED_NODE_CATEGORIES.add('constant');
-SUPPORTED_NODE_CATEGORIES.add('convert');
-SUPPORTED_NODE_CATEGORIES.add('position');
-SUPPORTED_NODE_CATEGORIES.add('normal');
-SUPPORTED_NODE_CATEGORIES.add('tangent');
-SUPPORTED_NODE_CATEGORIES.add('texcoord');
-SUPPORTED_NODE_CATEGORIES.add('geomcolor');
-SUPPORTED_NODE_CATEGORIES.add('image');
-SUPPORTED_NODE_CATEGORIES.add('tiledimage');
-SUPPORTED_NODE_CATEGORIES.add('gltf_anisotropy_image');
-SUPPORTED_NODE_CATEGORIES.add('gltf_iridescence_thickness');
-SUPPORTED_NODE_CATEGORIES.add('hextiledimage');
-SUPPORTED_NODE_CATEGORIES.add('hextilednormalmap');
-SUPPORTED_NODE_CATEGORIES.add('transformnormal');
-
-export { MtlXLibrary, SUPPORTED_NODE_CATEGORIES };
+export { MtlXLibrary };

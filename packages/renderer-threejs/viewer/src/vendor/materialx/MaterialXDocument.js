@@ -33,6 +33,8 @@ import {
   vec3,
   vec4,
   color,
+  dFdx,
+  dFdy,
   texture,
   positionLocal,
   positionWorld,
@@ -51,6 +53,7 @@ import {
 
 import { MaterialXSurfaceMappings } from './MaterialXSurfaceMappings.js';
 import { MtlXLibrary } from './MaterialXNodeLibrary.js';
+import { normalizeSpaceName } from './MaterialXUtils.js';
 
 const colorSpaceLib = {
   mx_srgb_texture_to_lin_rec709,
@@ -179,11 +182,30 @@ function mxHextileCoord(coord, rotation, rotationRange, scale, scaleRange, offse
     return add(add(div(rotated, vec2(safeScale, safeScale)), center), randomOffset);
   };
 
+  const sampleDerivative = (derivative, rotationValue, sampleScale) => {
+    const rotated = mxRotate2d(derivative, sin(rotationValue), cos(rotationValue));
+    const safeScale = max(sampleScale, HEXTILE_EPSILON);
+    return div(rotated, vec2(safeScale, safeScale));
+  };
+
+  const ddx = dFdx(coord);
+  const ddy = dFdy(coord);
+
   return {
     coords: [
       sampleCoord(ctr1, offset1, element(rotations, 0), element(scales, 0)),
       sampleCoord(ctr2, offset2, element(rotations, 1), element(scales, 1)),
       sampleCoord(ctr3, offset3, element(rotations, 2), element(scales, 2)),
+    ],
+    ddx: [
+      sampleDerivative(ddx, element(rotations, 0), element(scales, 0)),
+      sampleDerivative(ddx, element(rotations, 1), element(scales, 1)),
+      sampleDerivative(ddx, element(rotations, 2), element(scales, 2)),
+    ],
+    ddy: [
+      sampleDerivative(ddy, element(rotations, 0), element(scales, 0)),
+      sampleDerivative(ddy, element(rotations, 1), element(scales, 1)),
+      sampleDerivative(ddy, element(rotations, 2), element(scales, 2)),
     ],
     weights: vec3(w1, w2, w3),
   };
@@ -393,15 +415,6 @@ function isChannelOutput(outputName) {
     outputName === 'outw' || outputName === 'outa' || outputName === 'a';
 }
 
-function normalizeSpaceName(value, fallback = 'world') {
-  if (typeof value !== 'string') return fallback;
-  const normalized = value.trim().toLowerCase();
-  if (normalized === '') return fallback;
-  if (normalized === 'world') return 'world';
-  if (normalized === 'object' || normalized === 'model') return 'object';
-  return fallback;
-}
-
 class MaterialXNode {
   constructor(materialX, nodeXML, nodePath = '') {
     this.materialX = materialX;
@@ -504,7 +517,7 @@ class MaterialXNode {
 
     const textureNode = new Texture();
     textureNode.wrapS = textureNode.wrapT = RepeatWrapping;
-    textureNode.flipY = !svgTexture;
+    textureNode.flipY = false;
     this.materialX.textureCache.set(resolvedURI, textureNode);
 
     loader.load(resolvedURI, (imageData) => {
@@ -616,15 +629,15 @@ class MaterialXNode {
         node = this.getNodeByName('value');
       } else if (elementName === 'position') {
         const rawSpace = this.getInputValueByName('space') ?? this.getAttribute('space');
-        const space = normalizeSpaceName(rawSpace, 'world');
+        const space = normalizeSpaceName(rawSpace, 'object');
         node = space === 'world' ? positionWorld : positionLocal;
       } else if (elementName === 'normal') {
         const rawSpace = this.getInputValueByName('space') ?? this.getAttribute('space');
-        const space = normalizeSpaceName(rawSpace, 'world');
+        const space = normalizeSpaceName(rawSpace, 'object');
         node = space === 'world' ? normalWorld : normalLocal;
       } else if (elementName === 'tangent') {
         const rawSpace = this.getInputValueByName('space') ?? this.getAttribute('space');
-        const space = normalizeSpaceName(rawSpace, 'world');
+        const space = normalizeSpaceName(rawSpace, 'object');
         node = space === 'world' ? tangentWorld : tangentLocal;
       } else if (elementName === 'texcoord') {
         const indexNode = this.getChildByName('index');
@@ -648,11 +661,11 @@ class MaterialXNode {
         if (colorSpaceNode) node = colorSpaceNode(node);
       } else if (elementName === 'image') {
         const file = this.getChildByName('file');
-        const uvNode = this.getNodeByName('texcoord');
-        const textureFile = file.getTexture();
-        node = texture(textureFile, mxFromUvSpace(uvNode));
+        const uvNode = this.getNodeByName('texcoord') || mxToUvSpace(uv(0));
+        const textureFile = file ? file.getTexture() : null;
+        node = textureFile ? texture(textureFile, mxFromUvSpace(uvNode)) : vec4(0, 0, 0, 1);
 
-        const colorSpaceNode = file.getColorSpaceNode();
+        const colorSpaceNode = file ? file.getColorSpaceNode() : null;
         if (colorSpaceNode) node = colorSpaceNode(node);
       } else if (elementName === 'hextiledimage' || elementName === 'hextilednormalmap') {
         const file = this.getChildByName('file');
@@ -678,9 +691,10 @@ class MaterialXNode {
           const transformedUv = mul(uvNode, tiling);
           const tileData = mxHextileCoord(transformedUv, rotation, rotationRange, scale, scaleRange, offset, offsetRange);
 
-          let sample0 = texture(textureFile, mxFromUvSpace(tileData.coords[0]));
-          let sample1 = texture(textureFile, mxFromUvSpace(tileData.coords[1]));
-          let sample2 = texture(textureFile, mxFromUvSpace(tileData.coords[2]));
+          const invertY = (v) => vec2(element(v, 0), mul(element(v, 1), -1));
+          let sample0 = texture(textureFile, mxFromUvSpace(tileData.coords[0])).grad(invertY(tileData.ddx[0]), invertY(tileData.ddy[0]));
+          let sample1 = texture(textureFile, mxFromUvSpace(tileData.coords[1])).grad(invertY(tileData.ddx[1]), invertY(tileData.ddy[1]));
+          let sample2 = texture(textureFile, mxFromUvSpace(tileData.coords[2])).grad(invertY(tileData.ddx[2]), invertY(tileData.ddy[2]));
           const sample0Raw = sample0;
           const sample1Raw = sample1;
           const sample2Raw = sample2;
@@ -770,6 +784,56 @@ class MaterialXNode {
         const thicknessMin = this.getNodeByName('thicknessMin') || float(100);
         const thicknessMax = this.getNodeByName('thicknessMax') || float(400);
         node = add(thicknessMin, mul(sampledThickness, sub(thicknessMax, thicknessMin)));
+      } else if (elementName === 'transformmatrix') {
+        const nodeDefName = this.getAttribute('nodedef');
+        const inNode = this.getNodeByName('in') || float(0);
+        const matrixNode =
+          this.getNodeByName('mat') ||
+          (nodeDefName === 'ND_transformmatrix_vector2M3' || nodeDefName === 'ND_transformmatrix_vector3'
+            ? mat3(...IDENTITY_MAT3_VALUES)
+            : mat4(...IDENTITY_MAT4_VALUES));
+
+        if (nodeDefName === 'ND_transformmatrix_vector2M3') {
+          const transformed = mul(
+            matrixNode,
+            vec3(
+              element(inNode, 0),
+              element(inNode, 1),
+              1,
+            ),
+          );
+          node = vec2(element(transformed, 0), element(transformed, 1));
+        } else if (nodeDefName === 'ND_transformmatrix_vector3') {
+          node = mul(
+            matrixNode,
+            vec3(
+              element(inNode, 0),
+              element(inNode, 1),
+              element(inNode, 2),
+            ),
+          );
+        } else if (nodeDefName === 'ND_transformmatrix_vector3M4') {
+          const transformed = mul(
+            matrixNode,
+            vec4(
+              element(inNode, 0),
+              element(inNode, 1),
+              element(inNode, 2),
+              1,
+            ),
+          );
+          node = vec3(element(transformed, 0), element(transformed, 1), element(transformed, 2));
+        } else {
+          node = mul(
+            matrixNode,
+            vec4(
+              element(inNode, 0),
+              element(inNode, 1),
+              element(inNode, 2),
+              element(inNode, 3),
+            ),
+          );
+        }
       } else if (elementName === 'invertmatrix') {
         const inInput = this.getChildByName('in');
         const matrixType = inInput ? inInput.type : null;
@@ -1018,7 +1082,7 @@ class MaterialXDocument {
     this.imageLoader = new ImageLoader(manager);
     this.imageLoader.setPath(path);
     this.textureLoader = new ImageBitmapLoader(manager);
-    this.textureLoader.setOptions({ imageOrientation: 'flipY' });
+    this.textureLoader.setOptions({ imageOrientation: 'none' });
     this.textureLoader.setPath(path);
     this.textureCache = new Map();
   }
