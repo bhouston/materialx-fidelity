@@ -23,8 +23,6 @@ import {
   max,
   mix,
   mul,
-  mx_atan2,
-  normalMap,
   pow,
   sin,
   step,
@@ -36,14 +34,7 @@ import {
   dFdx,
   dFdy,
   texture,
-  positionLocal,
-  positionWorld,
   uv,
-  vertexColor,
-  normalLocal,
-  normalWorld,
-  tangentLocal,
-  tangentWorld,
   mat3,
   mat4,
   element,
@@ -51,9 +42,11 @@ import {
   mx_srgb_texture_to_lin_rec709,
 } from 'three/tsl';
 
-import { MaterialXSurfaceMappings } from './MaterialXSurfaceMappings.js';
+import { createMaterialXCompileRegistry, compileNodeFromRegistry } from './compile/MaterialXCompileRegistry.js';
+import { parseMaterialXNodeTree, parseMaterialXText } from './parse/MaterialXParser.js';
+import { getSurfaceMapper, getSupportedSurfaceCategories } from './MaterialXSurfaceRegistry.js';
 import { MtlXLibrary } from './MaterialXNodeLibrary.js';
-import { normalizeSpaceName } from './MaterialXUtils.js';
+import { validateCategoryCoverage } from './MaterialXNodeRegistry.js';
 
 const colorSpaceLib = {
   mx_srgb_texture_to_lin_rec709,
@@ -65,6 +58,9 @@ const MATRIX_INVERSE_EPSILON = 1e-8;
 const HEXTILE_SQRT3_2 = Math.sqrt(3) * 2;
 const HEXTILE_EPSILON = 1e-6;
 const HEXTILE_PI_OVER_180 = Math.PI / 180;
+const COMPILE_REGISTRY = createMaterialXCompileRegistry();
+const ALLOWED_NON_STANDARD_COMPILE_CATEGORIES = ['hextiledimage', 'hextilednormalmap', 'gltf_anisotropy_image'];
+let translatorRegistryValidated = false;
 
 function toRadians(degrees) {
   return mul(degrees, HEXTILE_PI_OVER_180);
@@ -620,273 +616,7 @@ class MaterialXNode {
         node = float(0);
       }
     } else {
-      const elementName = this.element;
-
-      if (elementName === 'convert') {
-        const nodeClass = this.getClassFromType(type) || float;
-        node = nodeClass(this.getNodeByName('in'));
-      } else if (elementName === 'constant') {
-        node = this.getNodeByName('value');
-      } else if (elementName === 'position') {
-        const rawSpace = this.getInputValueByName('space') ?? this.getAttribute('space');
-        const space = normalizeSpaceName(rawSpace, 'object');
-        node = space === 'world' ? positionWorld : positionLocal;
-      } else if (elementName === 'normal') {
-        const rawSpace = this.getInputValueByName('space') ?? this.getAttribute('space');
-        const space = normalizeSpaceName(rawSpace, 'object');
-        node = space === 'world' ? normalWorld : normalLocal;
-      } else if (elementName === 'tangent') {
-        const rawSpace = this.getInputValueByName('space') ?? this.getAttribute('space');
-        const space = normalizeSpaceName(rawSpace, 'object');
-        node = space === 'world' ? tangentWorld : tangentLocal;
-      } else if (elementName === 'texcoord') {
-        const indexNode = this.getChildByName('index');
-        const index = indexNode ? parseInt(indexNode.value) : 0;
-        node = mxToUvSpace(uv(index));
-      } else if (elementName === 'geomcolor') {
-        const indexNode = this.getChildByName('index');
-        const index = indexNode ? parseInt(indexNode.value) : 0;
-        node = vertexColor(index);
-      } else if (elementName === 'tiledimage') {
-        const file = this.getChildByName('file');
-        const textureFile = file.getTexture();
-        const uvNode = this.getNodeByName('texcoord') || mxToUvSpace(uv(0));
-        const uvTiling = this.getNodeByName('uvtiling');
-        const uvOffset = this.getNodeByName('uvoffset');
-        // three/tsl expects (scale, offset, uv), not (uv, scale, offset).
-        const transformedUv = mx_transform_uv(uvTiling, uvOffset, uvNode);
-        node = texture(textureFile, mxFromUvSpace(transformedUv));
-
-        const colorSpaceNode = file.getColorSpaceNode();
-        if (colorSpaceNode) node = colorSpaceNode(node);
-      } else if (elementName === 'image') {
-        const file = this.getChildByName('file');
-        const uvNode = this.getNodeByName('texcoord') || mxToUvSpace(uv(0));
-        const textureFile = file ? file.getTexture() : null;
-        node = textureFile ? texture(textureFile, mxFromUvSpace(uvNode)) : vec4(0, 0, 0, 1);
-
-        const colorSpaceNode = file ? file.getColorSpaceNode() : null;
-        if (colorSpaceNode) node = colorSpaceNode(node);
-      } else if (elementName === 'hextiledimage' || elementName === 'hextilednormalmap') {
-        const file = this.getChildByName('file');
-        if (!file) {
-          this.materialX.issueCollector.addInvalidValue(
-            this.name,
-            `Texture node "${this.name || this.element}" is missing required input "file".`,
-          );
-          node = vec4(0, 0, 0, 1);
-        } else {
-          const textureFile = file.getTexture();
-          const uvNode = this.getNodeByName('texcoord') || mxToUvSpace(uv(0));
-          const tiling = this.getNodeByName('tiling') || vec2(1, 1);
-          const rotation = this.getNodeByName('rotation') || float(1);
-          const rotationRange = this.getNodeByName('rotationrange') || vec2(0, 360);
-          const scale = this.getNodeByName('scale') || float(1);
-          const scaleRange = this.getNodeByName('scalerange') || vec2(0.5, 2);
-          const offset = this.getNodeByName('offset') || float(1);
-          const offsetRange = this.getNodeByName('offsetrange') || vec2(0, 1);
-          const falloff = this.getNodeByName('falloff') || float(0.5);
-          const falloffContrast = this.getNodeByName('falloffcontrast') || float(0.5);
-          const lumaCoeffs = this.getNodeByName('lumacoeffs') || vec3(0.2722287, 0.6740818, 0.0536895);
-          const transformedUv = mul(uvNode, tiling);
-          const tileData = mxHextileCoord(transformedUv, rotation, rotationRange, scale, scaleRange, offset, offsetRange);
-
-          const invertY = (v) => vec2(element(v, 0), mul(element(v, 1), -1));
-          let sample0 = texture(textureFile, mxFromUvSpace(tileData.coords[0])).grad(invertY(tileData.ddx[0]), invertY(tileData.ddy[0]));
-          let sample1 = texture(textureFile, mxFromUvSpace(tileData.coords[1])).grad(invertY(tileData.ddx[1]), invertY(tileData.ddy[1]));
-          let sample2 = texture(textureFile, mxFromUvSpace(tileData.coords[2])).grad(invertY(tileData.ddx[2]), invertY(tileData.ddy[2]));
-          const sample0Raw = sample0;
-          const sample1Raw = sample1;
-          const sample2Raw = sample2;
-
-          const colorSpaceNode = file.getColorSpaceNode();
-          if (colorSpaceNode) {
-            sample0 = colorSpaceNode(sample0);
-            sample1 = colorSpaceNode(sample1);
-            sample2 = colorSpaceNode(sample2);
-          }
-
-          const c0 = vec3(element(sample0, 0), element(sample0, 1), element(sample0, 2));
-          const c1 = vec3(element(sample1, 0), element(sample1, 1), element(sample1, 2));
-          const c2 = vec3(element(sample2, 0), element(sample2, 1), element(sample2, 2));
-          const cw = mix(
-            vec3(1, 1, 1),
-            vec3(dot(c0, lumaCoeffs), dot(c1, lumaCoeffs), dot(c2, lumaCoeffs)),
-            vec3(falloffContrast, falloffContrast, falloffContrast),
-          );
-          const blendWeights = mxHextileComputeBlendWeights(cw, tileData.weights, falloff);
-          const alphaWeights = mxHextileComputeBlendWeights(vec3(1, 1, 1), tileData.weights, falloff);
-          const blendedRgb = add(
-            add(mul(element(blendWeights, 0), c0), mul(element(blendWeights, 1), c1)),
-            mul(element(blendWeights, 2), c2),
-          );
-          const blendedAlpha = add(
-            add(
-              mul(element(alphaWeights, 0), element(sample0Raw, 3)),
-              mul(element(alphaWeights, 1), element(sample1Raw, 3)),
-            ),
-            mul(element(alphaWeights, 2), element(sample2Raw, 3)),
-          );
-          const blended = vec4(blendedRgb, blendedAlpha);
-
-          if (elementName === 'hextilednormalmap') {
-            const normalScale = this.getNodeByName('scale') || float(1);
-            node = normalMap(blended, normalScale);
-          } else {
-            node = blended;
-          }
-        }
-      } else if (elementName === 'gltf_image' || elementName === 'gltf_colorimage' || elementName === 'gltf_normalmap') {
-        const file = this.getChildByName('file');
-        const uvNode = this.getNodeByName('texcoord') || mxToUvSpace(uv(0));
-        const textureFile = file ? file.getTexture() : null;
-        node = textureFile ? texture(textureFile, mxFromUvSpace(uvNode)) : float(0);
-
-        const colorSpaceNode = file ? file.getColorSpaceNode() : null;
-        if (colorSpaceNode) node = colorSpaceNode(node);
-        if (elementName === 'gltf_normalmap') {
-          const normalScale = this.getNodeByName('scale') || float(1);
-          node = normalMap(node, normalScale);
-        }
-      } else if (elementName === 'gltf_anisotropy_image') {
-        const file = this.getChildByName('file');
-        const uvNode = this.getNodeByName('texcoord') || mxToUvSpace(uv(0));
-        const defaultInput = this.getNodeByName('default') || vec3(1, 0.5, 1);
-        const textureFile = file ? file.getTexture() : null;
-        const sampled = textureFile
-          ? texture(textureFile, mxFromUvSpace(uvNode))
-          : vec4(element(defaultInput, 0), element(defaultInput, 1), element(defaultInput, 2), 1);
-        const anisotropyStrengthFactor = this.getNodeByName('anisotropy_strength') || float(1);
-        const anisotropyRotationFactor = this.getNodeByName('anisotropy_rotation') || float(0);
-        const encodedDirection = vec2(
-          sub(mul(element(sampled, 0), 2), 1),
-          sub(mul(element(sampled, 1), 2), 1),
-        );
-        const textureRotation = mx_atan2(element(encodedDirection, 1), element(encodedDirection, 0));
-        const anisotropyStrengthOut = clamp(mul(anisotropyStrengthFactor, element(sampled, 2)), 0, 1);
-        const anisotropyRotationOut = add(anisotropyRotationFactor, textureRotation);
-
-        if (out === 'anisotropy_rotation_out') {
-          return anisotropyRotationOut;
-        }
-
-        if (out === 'anisotropy_strength_out' || out === null) {
-          return anisotropyStrengthOut;
-        }
-
-        node = anisotropyStrengthOut;
-      } else if (elementName === 'gltf_iridescence_thickness') {
-        const file = this.getChildByName('file');
-        const uvNode = this.getNodeByName('texcoord') || mxToUvSpace(uv(0));
-        const textureFile = file ? file.getTexture() : null;
-        const sampled = textureFile ? texture(textureFile, mxFromUvSpace(uvNode)) : vec4(0, 0, 0, 1);
-        const sampledThickness = element(sampled, 0);
-        const thicknessMin = this.getNodeByName('thicknessMin') || float(100);
-        const thicknessMax = this.getNodeByName('thicknessMax') || float(400);
-        node = add(thicknessMin, mul(sampledThickness, sub(thicknessMax, thicknessMin)));
-      } else if (elementName === 'transformmatrix') {
-        const nodeDefName = this.getAttribute('nodedef');
-        const inNode = this.getNodeByName('in') || float(0);
-        const matrixNode =
-          this.getNodeByName('mat') ||
-          (nodeDefName === 'ND_transformmatrix_vector2M3' || nodeDefName === 'ND_transformmatrix_vector3'
-            ? mat3(...IDENTITY_MAT3_VALUES)
-            : mat4(...IDENTITY_MAT4_VALUES));
-
-        if (nodeDefName === 'ND_transformmatrix_vector2M3') {
-          const transformed = mul(
-            matrixNode,
-            vec3(
-              element(inNode, 0),
-              element(inNode, 1),
-              1,
-            ),
-          );
-          node = vec2(element(transformed, 0), element(transformed, 1));
-        } else if (nodeDefName === 'ND_transformmatrix_vector3') {
-          node = mul(
-            matrixNode,
-            vec3(
-              element(inNode, 0),
-              element(inNode, 1),
-              element(inNode, 2),
-            ),
-          );
-        } else if (nodeDefName === 'ND_transformmatrix_vector3M4') {
-          const transformed = mul(
-            matrixNode,
-            vec4(
-              element(inNode, 0),
-              element(inNode, 1),
-              element(inNode, 2),
-              1,
-            ),
-          );
-          node = vec3(element(transformed, 0), element(transformed, 1), element(transformed, 2));
-        } else {
-          node = mul(
-            matrixNode,
-            vec4(
-              element(inNode, 0),
-              element(inNode, 1),
-              element(inNode, 2),
-              element(inNode, 3),
-            ),
-          );
-        }
-      } else if (elementName === 'invertmatrix') {
-        const inInput = this.getChildByName('in');
-        const matrixType = inInput ? inInput.type : null;
-        const isMatrixType = matrixType === 'matrix33' || matrixType === 'matrix44';
-
-        if (inInput && inInput.isConst && isMatrixType) {
-          const size = matrixType === 'matrix33' ? 3 : 4;
-          const identityValues = size === 3 ? IDENTITY_MAT3_VALUES : IDENTITY_MAT4_VALUES;
-          const matrixValues = inInput.getVector();
-          const invertedValues = invertConstantMatrixValues(matrixValues, size);
-
-          if (invertedValues === null) {
-            this.materialX.issueCollector.addInvalidValue(
-              this.name,
-              `Matrix input for "${this.name || this.element}" is singular; using identity fallback.`,
-            );
-            node = size === 3 ? mat3(...identityValues) : mat4(...identityValues);
-          } else {
-            node = size === 3 ? mat3(...invertedValues) : mat4(...invertedValues);
-          }
-        } else {
-          const inNode = this.getNodeByName('in');
-          if (isMatrixType) {
-            const size = matrixType === 'matrix33' ? 3 : 4;
-            const fallback = size === 3 ? mat3(...IDENTITY_MAT3_VALUES) : mat4(...IDENTITY_MAT4_VALUES);
-            node = invertMatrixNode(inNode === undefined || inNode === null ? fallback : inNode, size);
-          } else {
-            node = inNode === undefined || inNode === null ? float(0) : inNode;
-          }
-        }
-      } else if (MtlXLibrary[elementName] !== undefined) {
-        const nodeElement = MtlXLibrary[elementName];
-        const args = this.getNodesByNames(...nodeElement.params);
-
-        for (let i = 0; i < nodeElement.params.length; i++) {
-          if (args[i] === undefined || args[i] === null) {
-            const paramName = nodeElement.params[i];
-            const defaultValue = nodeElement.defaults ? nodeElement.defaults[paramName] : undefined;
-
-            if (defaultValue !== undefined) {
-              args[i] = typeof defaultValue === 'function' ? defaultValue() : float(defaultValue);
-            } else {
-              this.materialX.issueCollector.addInvalidValue(
-                this.name,
-                `Missing input "${paramName}" for node "${this.name || this.element}" (${this.element}). Using fallback 0.`,
-              );
-              args[i] = float(0);
-            }
-          }
-        }
-
-        node = nodeElement.nodeFunc(...args);
-      }
+      node = compileNodeFromRegistry(this, out, this.materialX.compileContext);
     }
 
     if (node === null || node === undefined) {
@@ -982,9 +712,9 @@ class MaterialXNode {
   }
 
   setMaterial(material) {
-    const mapper = MaterialXSurfaceMappings[this.element];
+    const mapper = getSurfaceMapper(this.element);
     if (mapper) {
-      mapper(material, this.getNodes(), this.materialX.issueCollector, this.name);
+      mapper.apply(material, this.getNodes(), this.materialX.issueCollector, this.name);
     } else {
       this.materialX.issueCollector.addUnsupportedNode(this.element, this.name);
     }
@@ -1085,6 +815,29 @@ class MaterialXDocument {
     this.textureLoader.setOptions({ imageOrientation: 'none' });
     this.textureLoader.setPath(path);
     this.textureCache = new Map();
+
+    this.compileContext = {
+      compileRegistry: COMPILE_REGISTRY,
+      nodeLibrary: MtlXLibrary,
+      mxToUvSpace,
+      mxFromUvSpace,
+      mxTransformUv: mx_transform_uv,
+      mxHextileCoord,
+      mxHextileComputeBlendWeights,
+      invertConstantMatrixValues,
+      invertMatrixNode,
+      IDENTITY_MAT3_VALUES,
+      IDENTITY_MAT4_VALUES,
+    };
+
+    if (!translatorRegistryValidated) {
+      validateCategoryCoverage({
+        compileCategories: [...COMPILE_REGISTRY.keys()],
+        surfaceCategories: getSupportedSurfaceCategories(),
+        allowUnknownCompileCategories: ALLOWED_NON_STANDARD_COMPILE_CATEGORIES,
+      });
+      translatorRegistryValidated = true;
+    }
   }
 
   resolveTextureURI(uri) {
@@ -1105,20 +858,20 @@ class MaterialXDocument {
   }
 
   parseNode(nodeXML, nodePath = '') {
-    const materialXNode = new MaterialXNode(this, nodeXML, nodePath);
-    if (materialXNode.nodePath) this.addMaterialXNode(materialXNode);
-
-    for (const childNodeXML of nodeXML.children) {
-      const childMXNode = this.parseNode(childNodeXML, materialXNode.nodePath);
-      materialXNode.add(childMXNode);
-    }
-
-    return materialXNode;
+    return parseMaterialXNodeTree(
+      nodeXML,
+      (childNodeXML, childNodePath) => new MaterialXNode(this, childNodeXML, childNodePath),
+      (materialXNode) => this.addMaterialXNode(materialXNode),
+      nodePath,
+    );
   }
 
   parse(text, materialName = null) {
-    const rootXML = new DOMParser().parseFromString(text, 'application/xml').documentElement;
-    const rootNode = this.parseNode(rootXML);
+    const rootNode = parseMaterialXText(
+      text,
+      (childNodeXML, childNodePath) => new MaterialXNode(this, childNodeXML, childNodePath),
+      (materialXNode) => this.addMaterialXNode(materialXNode),
+    );
     const materials = rootNode.toMaterials(materialName);
     const report = this.issueCollector.buildReport();
     return { materials, report };

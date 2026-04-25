@@ -466,4 +466,12 @@ const MaterialXSurfaceMappings = {
   open_pbr_surface: applyOpenPbrSurface,
 };
 
-export { MaterialXSurfaceMappings, mappedStandardSurfaceInputs, mappedGltfPbrInputs, mappedOpenPbrInputs };
+export {
+  MaterialXSurfaceMappings,
+  applyStandardSurface,
+  applyGltfPbrSurface,
+  applyOpenPbrSurface,
+  mappedStandardSurfaceInputs,
+  mappedGltfPbrInputs,
+  mappedOpenPbrInputs,
+};
