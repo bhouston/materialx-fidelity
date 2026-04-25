@@ -127,7 +127,14 @@ describe('threejs renderer', () => {
       backgroundColor: '0,0,0',
     });
 
+    const hasDisposeEvaluation = (page: typeof firstPage): boolean => {
+      const calls = page.evaluate.mock.calls as unknown[][];
+      return calls.some((call) => String(call[0]).includes('__MTLX_DISPOSE_SCENE__'));
+    };
+
     expect(browserContext.newPage).toHaveBeenCalledTimes(2);
+    expect(hasDisposeEvaluation(firstPage)).toBe(true);
+    expect(hasDisposeEvaluation(secondPage)).toBe(true);
     expect(firstPage.close).toHaveBeenCalledTimes(1);
     expect(secondPage.close).toHaveBeenCalledTimes(1);
 

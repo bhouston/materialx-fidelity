@@ -10,6 +10,12 @@ From repo root:
 pnpm --filter @material-fidelity/renderer-threejs generate:node-registry
 ```
 
+Validate that the committed artifact matches generator output:
+
+```bash
+pnpm --filter @material-fidelity/renderer-threejs validate:node-registry
+```
+
 The generator is in `packages/renderer-threejs/scripts/generate-node-registry.mjs`.
 
 ## MaterialX Source
@@ -24,8 +30,10 @@ MATERIALX_LIBRARIES_DIR=/absolute/path/to/MaterialX/libraries pnpm --filter @mat
 
 ## Generated Artifact
 
-The script writes:
+The script writes deterministic category metadata to:
 
 - `packages/renderer-threejs/viewer/src/vendor/materialx/generated/MaterialXNodeRegistry.generated.js`
 
 This file is consumed by startup validation in the Three.js MaterialX translator.
+
+For upstream contribution expectations and PR validation steps, see `THREEJS_UPSTREAM_CHECKLIST.md`.

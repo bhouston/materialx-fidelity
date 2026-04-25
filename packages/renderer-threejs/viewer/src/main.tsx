@@ -10,6 +10,7 @@ declare global {
   var __MTLX_CAPTURE_DONE__: boolean | undefined;
   var __MTLX_CAPTURE_ERROR__: string | undefined;
   var __MTLX_FORCE_RENDER__: (() => void) | undefined;
+  var __MTLX_DISPOSE_SCENE__: (() => void) | undefined;
 }
 
 const querySchema = z.object({
@@ -107,6 +108,47 @@ function splitPath(path: string): { basePath: string; fileName: string } {
   };
 }
 
+function disposeMaterialTextures(material: THREE.Material): void {
+  const candidate = material as Record<string, unknown>;
+  for (const value of Object.values(candidate)) {
+    if (!value || typeof value !== 'object') {
+      continue;
+    }
+    const texture = value as { isTexture?: boolean; dispose?: () => void };
+    if (texture.isTexture && typeof texture.dispose === 'function') {
+      texture.dispose();
+    }
+  }
+}
+
+function disposeObject3DResources(root: THREE.Object3D): void {
+  const materials = new Set<THREE.Material>();
+  root.traverse((node: THREE.Object3D) => {
+    const mesh = node as THREE.Mesh;
+    if (!mesh.isMesh) {
+      return;
+    }
+    mesh.geometry?.dispose();
+    const meshMaterial = mesh.material;
+    if (Array.isArray(meshMaterial)) {
+      for (const material of meshMaterial) {
+        if (material?.isMaterial) {
+          materials.add(material);
+        }
+      }
+      return;
+    }
+    if (meshMaterial && typeof meshMaterial === 'object' && (meshMaterial as { isMaterial?: boolean }).isMaterial) {
+      materials.add(meshMaterial as THREE.Material);
+    }
+  });
+
+  for (const material of materials) {
+    disposeMaterialTextures(material);
+    material.dispose();
+  }
+}
+
 function recenterAndNormalizeModel(model: THREE.Object3D): void {
   // First, bake the GLTF node hierarchy into the geometry to match MaterialXView's "Object Space"
   model.updateMatrixWorld(true);
@@ -156,10 +198,31 @@ async function buildScene(): Promise<void> {
     throw new Error('Capture root element not found.');
   }
 
+  let sceneForCleanup: THREE.Scene | undefined;
+  let rendererForCleanup: THREE.WebGPURenderer | undefined;
+  let environmentTextureForCleanup: THREE.Texture | undefined;
+  let modelForCleanup: THREE.Object3D | undefined;
+  let materialXLoaderForCleanup: MaterialXLoader | undefined;
+  globalThis.__MTLX_DISPOSE_SCENE__ = () => {
+    materialXLoaderForCleanup?.dispose?.();
+    if (modelForCleanup) {
+      disposeObject3DResources(modelForCleanup);
+    }
+    environmentTextureForCleanup?.dispose();
+    if (sceneForCleanup) {
+      sceneForCleanup.clear();
+    }
+    rendererForCleanup?.dispose();
+    const domElement = rendererForCleanup?.domElement;
+    domElement?.parentElement?.removeChild(domElement);
+    globalThis.__MTLX_FORCE_RENDER__ = undefined;
+  };
+
   const renderer = new THREE.WebGPURenderer({
     antialias: true,
     forceWebGL: false,
   });
+  rendererForCleanup = renderer;
   renderer.setPixelRatio(1);
   renderer.setSize(REFERENCE_IMAGE_WIDTH, REFERENCE_IMAGE_HEIGHT, false);
   renderer.toneMapping = THREE.NoToneMapping;
@@ -168,6 +231,7 @@ async function buildScene(): Promise<void> {
   mount.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
+  sceneForCleanup = scene;
   const camera = new THREE.PerspectiveCamera(45, REFERENCE_IMAGE_WIDTH / REFERENCE_IMAGE_HEIGHT, 0.05, 1000);
   camera.position.set(0, 0, 5);
   camera.lookAt(0, 0, 0);
@@ -178,6 +242,7 @@ async function buildScene(): Promise<void> {
 
   const hdrLoader = new HDRLoader();
   const environmentTexture = await hdrLoader.loadAsync(query.environmentHdrPath);
+  environmentTextureForCleanup = environmentTexture;
   environmentTexture.mapping = THREE.EquirectangularReflectionMapping;
   const environmentRotationRadians = THREE.MathUtils.degToRad(query.environmentRotationDegrees);
   scene.environment = environmentTexture;
@@ -188,11 +253,13 @@ async function buildScene(): Promise<void> {
 
   const gltfLoader = new GLTFLoader();
   const gltf = await gltfLoader.loadAsync(query.modelPath);
+  modelForCleanup = gltf.scene;
   recenterAndNormalizeModel(gltf.scene);
   scene.add(gltf.scene);
 
   const materialXPath = splitPath(query.mtlxPath);
-  const materialXLoader = new MaterialXLoader().setPath(materialXPath.basePath).setUnsupportedPolicy('error');
+  const materialXLoader = new MaterialXLoader().setPath(materialXPath.basePath).setIssuePolicy('error-core');
+  materialXLoaderForCleanup = materialXLoader;
   const materialXResult =
     typeof materialXLoader.loadAsync === 'function'
       ? await materialXLoader.loadAsync(materialXPath.fileName)
@@ -236,6 +303,7 @@ async function initialize(): Promise<void> {
   globalThis.__MTLX_CAPTURE_DONE__ = false;
   delete globalThis.__MTLX_CAPTURE_ERROR__;
   globalThis.__MTLX_FORCE_RENDER__ = undefined;
+  globalThis.__MTLX_DISPOSE_SCENE__ = undefined;
 
   try {
     await buildScene();

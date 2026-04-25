@@ -762,10 +762,12 @@ const MXElements = [
     center: defaultFloat(0.5),
   }),
   new MXElement('noise2d', mx_noise_float, ['texcoord', 'amplitude', 'pivot'], {
+    texcoord: defaultVec2(0, 0),
     amplitude: defaultFloat(1),
     pivot: defaultFloat(0),
   }),
   new MXElement('noise3d', mx_noise_float, ['texcoord', 'amplitude', 'pivot'], {
+    texcoord: defaultVec3(0, 0, 0),
     amplitude: defaultFloat(1),
     pivot: defaultFloat(0),
   }),
@@ -776,10 +778,16 @@ const MXElements = [
     diminish: defaultFloat(0.5),
     amplitude: defaultFloat(1.0),
   }),
-  new MXElement('cellnoise2d', mx_cell_noise_float, ['texcoord']),
-  new MXElement('cellnoise3d', mx_cell_noise_float, ['texcoord']),
-  new MXElement('worleynoise2d', mx_worley_noise_float, ['texcoord', 'jitter'], { jitter: defaultFloat(1) }),
-  new MXElement('worleynoise3d', mx_worley_noise_float, ['texcoord', 'jitter'], { jitter: defaultFloat(1) }),
+  new MXElement('cellnoise2d', mx_cell_noise_float, ['texcoord'], { texcoord: defaultVec2(0, 0) }),
+  new MXElement('cellnoise3d', mx_cell_noise_float, ['texcoord'], { texcoord: defaultVec3(0, 0, 0) }),
+  new MXElement('worleynoise2d', mx_worley_noise_float, ['texcoord', 'jitter'], {
+    texcoord: defaultVec2(0, 0),
+    jitter: defaultFloat(1),
+  }),
+  new MXElement('worleynoise3d', mx_worley_noise_float, ['texcoord', 'jitter'], {
+    texcoord: defaultVec3(0, 0, 0),
+    jitter: defaultFloat(1),
+  }),
   new MXElement(
     'unifiednoise2d',
     mx_unifiednoise2d,
@@ -798,6 +806,7 @@ const MXElements = [
     ],
     {
       type: defaultInt(0),
+      texcoord: defaultVec2(0, 0),
       freq: defaultVec2(1, 1),
       offset: defaultVec2(0, 0),
       jitter: defaultFloat(1),
@@ -827,6 +836,7 @@ const MXElements = [
     ],
     {
       type: defaultInt(0),
+      texcoord: defaultVec3(0, 0, 0),
       freq: defaultVec3(1, 1, 1),
       offset: defaultVec3(0, 0, 0),
       jitter: defaultFloat(1),

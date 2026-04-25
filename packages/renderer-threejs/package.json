@@ -13,7 +13,8 @@
     "tsc": "tsgo",
     "tsgo": "tsgo",
     "dev": "tsgo -w --preserveWatchOutput",
-    "generate:node-registry": "node ./scripts/generate-node-registry.mjs"
+    "generate:node-registry": "node ./scripts/generate-node-registry.mjs",
+    "validate:node-registry": "node ./scripts/validate-node-registry.mjs"
   },
   "dependencies": {
     "@material-fidelity/core": "workspace:*",

@@ -569,27 +569,8 @@ class MaterialXNode {
       return element(inNode, getOutputChannel(out));
     }
 
-    if (this.element === 'gltf_colorimage' && out) {
-      const file = this.getChildByName('file');
-      const uvNode = this.getNodeByName('texcoord') || mxToUvSpace(uv(0));
-      const textureFile = file ? file.getTexture() : null;
-      const sampled = textureFile ? texture(textureFile, mxFromUvSpace(uvNode)) : vec4(0, 0, 0, 1);
-
-      if (out === 'outa' || out === 'a') {
-        return element(sampled, 3);
-      }
-
-      const colorSpaceNode = file ? file.getColorSpaceNode() : null;
-      if (colorSpaceNode) {
-        const converted = colorSpaceNode(sampled);
-        return vec3(element(converted, 0), element(converted, 1), element(converted, 2));
-      }
-
-      return vec3(element(sampled, 0), element(sampled, 1), element(sampled, 2));
-    }
-
     const type = this.type;
-    const channelRequested = this.element !== 'input' && isChannelOutput(out);
+    const channelRequested = this.element !== 'input' && this.element !== 'gltf_colorimage' && isChannelOutput(out);
 
     if (this.isConst) {
       if (type === 'boolean') {
@@ -631,6 +612,10 @@ class MaterialXNode {
     const resolvedType = channelRequested ? 'float' : type;
     if (resolvedType === 'boolean') {
       node = this.toBooleanMaskNode(node);
+    } else if (resolvedType === 'string') {
+      // String-typed inputs (for example transform* fromspace/tospace) are
+      // valid scalar parameters and should pass through without numeric casting.
+      node = typeof node === 'string' ? node : this.getValue();
     } else {
       const nodeToTypeClass = this.getClassFromType(resolvedType);
       if (nodeToTypeClass !== null) {
@@ -641,7 +626,9 @@ class MaterialXNode {
       }
     }
 
-    node.name = this.name;
+    if (node && typeof node === 'object') {
+      node.name = this.name;
+    }
     this.node = node;
     return node;
   }

@@ -56,7 +56,7 @@ function createArchiveResolver(files) {
     return null;
   };
 
-  return (uri) => {
+  const resolve = (uri) => {
     if (objectUrlCache.has(uri)) return objectUrlCache.get(uri);
 
     const bytes = getFile(uri);
@@ -67,6 +67,15 @@ function createArchiveResolver(files) {
     objectUrlCache.set(uri, objectUrl);
     return objectUrl;
   };
+
+  const dispose = () => {
+    for (const objectUrl of objectUrlCache.values()) {
+      URL.revokeObjectURL(objectUrl);
+    }
+    objectUrlCache.clear();
+  };
+
+  return { resolve, dispose };
 }
 
 export { isZipBuffer, readMtlxArchive, createArchiveResolver };

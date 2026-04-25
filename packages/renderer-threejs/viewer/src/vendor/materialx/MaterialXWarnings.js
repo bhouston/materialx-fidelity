@@ -6,9 +6,30 @@ const ISSUE_CODES = {
   INVALID_VALUE: 'invalid-value',
 };
 
+const ISSUE_POLICIES = {
+  WARN: 'warn',
+  ERROR_CORE: 'error-core',
+  ERROR_ALL: 'error-all',
+};
+
+const LEGACY_POLICY_ALIASES = {
+  error: ISSUE_POLICIES.ERROR_CORE,
+};
+
+function normalizeIssuePolicy(policy) {
+  const normalized = policy && typeof policy === 'string' ? policy : ISSUE_POLICIES.WARN;
+  if (normalized in LEGACY_POLICY_ALIASES) {
+    return LEGACY_POLICY_ALIASES[normalized];
+  }
+  if (normalized === ISSUE_POLICIES.WARN || normalized === ISSUE_POLICIES.ERROR_CORE || normalized === ISSUE_POLICIES.ERROR_ALL) {
+    return normalized;
+  }
+  return ISSUE_POLICIES.WARN;
+}
+
 class MaterialXIssueCollector {
   constructor(options = {}) {
-    this.unsupportedPolicy = options.unsupportedPolicy || 'warn';
+    this.issuePolicy = normalizeIssuePolicy(options.issuePolicy || options.unsupportedPolicy);
     this.onWarning = options.onWarning || null;
     this.issues = [];
   }
@@ -25,7 +46,7 @@ class MaterialXIssueCollector {
     this.issues.push(normalizedIssue);
 
     if (normalizedIssue.severity === 'warning') {
-      if (this.unsupportedPolicy === 'warn') {
+      if (this.issuePolicy === ISSUE_POLICIES.WARN) {
         console.warn(`THREE.MaterialXLoader: ${normalizedIssue.message}`);
       }
 
@@ -93,29 +114,42 @@ class MaterialXIssueCollector {
   }
 
   throwIfNeeded() {
-    if (this.unsupportedPolicy !== 'error') return;
-    const unsupportedNodes = this.issues.filter((issue) => issue.code === ISSUE_CODES.UNSUPPORTED_NODE);
-    const missingReferences = this.issues.filter((issue) => issue.code === ISSUE_CODES.MISSING_REFERENCE);
-    const invalidValues = this.issues.filter((issue) => issue.code === ISSUE_CODES.INVALID_VALUE);
+    if (this.issuePolicy === ISSUE_POLICIES.WARN) return;
 
-    if (unsupportedNodes.length === 0 && missingReferences.length === 0 && invalidValues.length === 0) return;
+    const coreCodes = new Set([ISSUE_CODES.UNSUPPORTED_NODE, ISSUE_CODES.MISSING_REFERENCE, ISSUE_CODES.INVALID_VALUE]);
+    const fatalIssues = this.issues.filter((issue) =>
+      this.issuePolicy === ISSUE_POLICIES.ERROR_ALL ? true : coreCodes.has(issue.code));
+    if (fatalIssues.length === 0) return;
+
+    const detailsByCode = new Map();
+    for (const issue of fatalIssues) {
+      const count = detailsByCode.get(issue.code) || 0;
+      detailsByCode.set(issue.code, count + 1);
+    }
 
     const details = [];
-    if (unsupportedNodes.length > 0) {
+    const unsupportedNodes = this.issues.filter((issue) => issue.code === ISSUE_CODES.UNSUPPORTED_NODE);
+    if (detailsByCode.has(ISSUE_CODES.UNSUPPORTED_NODE)) {
       const categoryList = [...new Set(unsupportedNodes.map((issue) => issue.category).filter(Boolean))].sort().join(', ');
-      details.push(
-        `unsupported node categories${categoryList ? `: ${categoryList}` : ''} (${unsupportedNodes.length})`,
-      );
+      details.push(`unsupported node categories${categoryList ? `: ${categoryList}` : ''} (${detailsByCode.get(ISSUE_CODES.UNSUPPORTED_NODE)})`);
     }
-    if (missingReferences.length > 0) {
-      details.push(`missing references (${missingReferences.length})`);
+    if (detailsByCode.has(ISSUE_CODES.MISSING_REFERENCE)) {
+      details.push(`missing references (${detailsByCode.get(ISSUE_CODES.MISSING_REFERENCE)})`);
     }
-    if (invalidValues.length > 0) {
-      details.push(`invalid values (${invalidValues.length})`);
+    if (detailsByCode.has(ISSUE_CODES.INVALID_VALUE)) {
+      details.push(`invalid values (${detailsByCode.get(ISSUE_CODES.INVALID_VALUE)})`);
+    }
+    if (detailsByCode.has(ISSUE_CODES.IGNORED_SURFACE_INPUT)) {
+      details.push(`ignored surface inputs (${detailsByCode.get(ISSUE_CODES.IGNORED_SURFACE_INPUT)})`);
+    }
+    if (detailsByCode.has(ISSUE_CODES.MISSING_MATERIAL)) {
+      details.push(`missing materials (${detailsByCode.get(ISSUE_CODES.MISSING_MATERIAL)})`);
     }
 
-    throw new Error(`THREE.MaterialXLoader: MaterialX translation failed in error mode; ${details.join('; ')}.`);
+    throw new Error(
+      `THREE.MaterialXLoader: MaterialX translation failed in ${this.issuePolicy} mode; ${details.join('; ')}.`,
+    );
   }
 }
 
-export { ISSUE_CODES, MaterialXIssueCollector };
+export { ISSUE_CODES, ISSUE_POLICIES, MaterialXIssueCollector, normalizeIssuePolicy };

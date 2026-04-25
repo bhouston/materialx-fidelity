@@ -1,10 +1,7 @@
-import { generatedSlimNodeCategories, generatedSlimNodeRegistry } from './generated/MaterialXNodeRegistry.generated.js';
-import { toRegistryMap } from './MaterialXTranslatorTypes.js';
+import { generatedSlimNodeCategories } from './generated/MaterialXNodeRegistry.generated.js';
 
 const surfaceFallbackCategories = ['surfacematerial', 'standard_surface', 'gltf_pbr', 'open_pbr_surface'];
 
-const materialXNodeSpecs = [...generatedSlimNodeRegistry];
-const materialXNodeSpecByCategory = toRegistryMap(materialXNodeSpecs, (entry) => entry.category, 'node');
 const materialXNodeCategories = new Set([...generatedSlimNodeCategories, ...surfaceFallbackCategories]);
 
 function hasMaterialXCategory(category) {
@@ -38,18 +35,16 @@ function validateCategoryCoverage({
 
   const details = [];
   if (unknownCompile.length > 0) {
-    details.push(`unknown compile categories: ${unknownCompile.sort().join(', ')}`);
+    details.push(`unknown compile categories: ${unknownCompile.toSorted().join(', ')}`);
   }
   if (unknownSurface.length > 0) {
-    details.push(`unknown surface categories: ${unknownSurface.sort().join(', ')}`);
+    details.push(`unknown surface categories: ${unknownSurface.toSorted().join(', ')}`);
   }
 
   throw new Error(`MaterialX translator registry validation failed (${details.join('; ')}).`);
 }
 
 export {
-  materialXNodeSpecs,
-  materialXNodeSpecByCategory,
   materialXNodeCategories,
   hasMaterialXCategory,
   validateCategoryCoverage,

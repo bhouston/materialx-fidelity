@@ -67,6 +67,16 @@ async function renderAdditionalFrames(page: Page, passes: number): Promise<void>
   }
 }
 
+async function disposePageScene(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const disposeCandidate = Reflect.get(globalThis, '__MTLX_DISPOSE_SCENE__');
+    const disposeScene = typeof disposeCandidate === 'function' ? disposeCandidate : undefined;
+    disposeScene?.();
+    Reflect.deleteProperty(globalThis, '__MTLX_DISPOSE_SCENE__');
+    Reflect.set(globalThis, '__MTLX_FORCE_RENDER__', undefined);
+  });
+}
+
 function toLogLevel(type: string): RenderLogEntry['level'] {
   if (type === 'error') return 'error';
   if (type === 'warning') return 'warning';
@@ -315,6 +325,7 @@ class ThreeJsRenderer implements FidelityRenderer {
     } finally {
       page.off('console', onConsole);
       page.off('pageerror', onPageError);
+      await Promise.allSettled([disposePageScene(page)]);
       await page.close();
     }
   }

@@ -1,7 +1,7 @@
 import { FileLoader, Loader } from 'three/webgpu';
 
 import { MaterialXDocument } from './materialx/MaterialXDocument.js';
-import { MaterialXIssueCollector } from './materialx/MaterialXWarnings.js';
+import { MaterialXIssueCollector, normalizeIssuePolicy } from './materialx/MaterialXWarnings.js';
 import { isZipBuffer, readMtlxArchive, createArchiveResolver } from './materialx/MaterialXArchive.js';
 
 const _textDecoder = new TextDecoder();
@@ -9,14 +9,19 @@ const _textDecoder = new TextDecoder();
 class MaterialXLoader extends Loader {
   constructor(manager) {
     super(manager);
-    this.unsupportedPolicy = 'warn';
+    this.issuePolicy = 'warn';
     this.warningCallback = null;
     this.materialName = null;
+    this.archiveDisposer = null;
+  }
+
+  setIssuePolicy(policy) {
+    this.issuePolicy = normalizeIssuePolicy(policy);
+    return this;
   }
 
   setUnsupportedPolicy(policy) {
-    this.unsupportedPolicy = policy;
-    return this;
+    return this.setIssuePolicy(policy);
   }
 
   setWarningCallback(callback) {
@@ -26,6 +31,18 @@ class MaterialXLoader extends Loader {
 
   setMaterialName(materialName) {
     this.materialName = materialName;
+    return this;
+  }
+
+  clearArchiveResources() {
+    if (this.archiveDisposer) {
+      this.archiveDisposer();
+      this.archiveDisposer = null;
+    }
+  }
+
+  dispose() {
+    this.clearArchiveResources();
     return this;
   }
 
@@ -58,13 +75,17 @@ class MaterialXLoader extends Loader {
   }
 
   parseBuffer(data, url = '') {
+    this.clearArchiveResources();
+
     let text;
     let archiveResolver = null;
 
     if (data && (isZipBuffer(data) || /\.mtlx\.zip$/i.test(url))) {
       const archive = readMtlxArchive(data);
       text = archive.text;
-      archiveResolver = createArchiveResolver(archive.files);
+      const resolver = createArchiveResolver(archive.files);
+      archiveResolver = resolver.resolve;
+      this.archiveDisposer = resolver.dispose;
     } else if (typeof data === 'string') {
       text = data;
     } else if (data instanceof Uint8Array) {
@@ -78,7 +99,7 @@ class MaterialXLoader extends Loader {
 
   parse(text, archiveResolver = null) {
     const issueCollector = new MaterialXIssueCollector({
-      unsupportedPolicy: this.unsupportedPolicy,
+      issuePolicy: this.issuePolicy,
       onWarning: this.warningCallback,
     });
 
