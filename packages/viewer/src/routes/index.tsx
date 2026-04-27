@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { createServerFn } from '@tanstack/react-start';
-import { X } from 'lucide-react';
+import { Info, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useGoogleAnalytics } from 'tanstack-router-ga4';
 import Header from '#/components/Header';
@@ -258,7 +258,7 @@ function App() {
             MaterialX
           </a>{' '}
           sample materials and compares renderer reference renders side-by-side so you can quickly spot visual
-          differences and missing captures.
+          differences and view render log/error output (click the <Info className="size-4 inline-block" /> icons).
         </p>
         <div className="mt-3 max-w-5xl text-sm leading-6 text-muted-foreground sm:text-base">
           <p className="font-medium text-foreground">Enabled renderers:</p>
