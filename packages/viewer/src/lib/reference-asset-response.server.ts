@@ -19,7 +19,7 @@ function ifNoneMatchIncludesStrongEtag(ifNoneMatch: string | null, etag: string)
 }
 
 function cacheControlForReferenceAsset(): string {
-  return process.env.NODE_ENV === 'production' ? 'max-age=3600, edge max-age=86400, stale-while-revalidate=3600' : 'public, max-age=60';
+  return process.env.NODE_ENV === 'production' ? 'max-age=3600, edge max-age=3600' : 'public, max-age=60';
 }
 
 /** GET response for reference images/reports: MD5 strong ETag and 304 when If-None-Match matches. */
