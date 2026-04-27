@@ -12,12 +12,16 @@ export const Route = createFileRoute('/api/reference-report/$materialType/$mater
         }
 
         const bytes = await readFile(filePath);
+        const cacheControl =
+          process.env.NODE_ENV === 'production'
+            ? 'public, max-age=86400'
+            : 'no-store';
         return new Response(bytes, {
           status: 200,
           headers: {
             'Content-Type': 'application/json; charset=utf-8',
             'Content-Length': bytes.length.toString(),
-            'Cache-Control': `public, max-age=${3600}`,
+            'Cache-Control': cacheControl,
           },
         });
       },

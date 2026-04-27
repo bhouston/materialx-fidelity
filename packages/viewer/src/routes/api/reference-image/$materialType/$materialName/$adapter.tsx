@@ -12,12 +12,16 @@ export const Route = createFileRoute('/api/reference-image/$materialType/$materi
         }
 
         const bytes = await readFile(filePath);
+        const cacheControl =
+          process.env.NODE_ENV === 'production'
+            ? 'public, max-age=86400'
+            : 'no-store';
         return new Response(bytes, {
           status: 200,
           headers: {
             'Content-Type': 'image/png',
             'Content-Length': bytes.length.toString(),
-            'Cache-Control': `public, max-age=${3600}`,
+            'Cache-Control': cacheControl,
           },
         });
       },
