@@ -25,6 +25,18 @@ RUN pnpm install --frozen-lockfile --prefer-offline
 
 RUN pnpm --filter @material-viewer/materialx build
 
+# Viewer bundle reads metadata env vars at build time (Vite `define`). Override via `docker build --build-arg BASE_URL=https://…`.
+ARG BASE_URL=""
+ARG SITE_NAME=""
+ARG SITE_DESCRIPTION=""
+ARG DEFAULT_SITE_IMAGE=""
+ARG TWITTER_SITE=""
+ENV BASE_URL=${BASE_URL} \
+    SITE_NAME=${SITE_NAME} \
+    SITE_DESCRIPTION=${SITE_DESCRIPTION} \
+    DEFAULT_SITE_IMAGE=${DEFAULT_SITE_IMAGE} \
+    TWITTER_SITE=${TWITTER_SITE}
+
 RUN pnpm build
 
 EXPOSE 8080

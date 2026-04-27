@@ -9,6 +9,9 @@ import { RenderLogViewer } from '#/components/RenderLogViewer';
 import type { ReportLogEntry } from '#/components/RenderLogViewer';
 import { getViewerIndexData } from '#/lib/material-index';
 import { getRendererMetadata } from '#/lib/renderer-metadata';
+import { getHead } from '#/lib/metadata';
+import { DEFAULT_SITE_IMAGE, SITE_DESCRIPTION, SITE_NAME, getResolvedBaseUrl } from '#/lib/site-config';
+import { getViewerWebsiteJsonLd } from '#/lib/structured-data';
 
 const getViewerData = createServerFn({
   method: 'GET',
@@ -22,6 +25,19 @@ export const Route = createFileRoute('/')({
     };
   },
   loader: () => getViewerData(),
+  head: () => {
+    const baseUrl = getResolvedBaseUrl();
+    const canonicalUrl = baseUrl ? `${baseUrl}/` : '';
+    return getHead({
+      title: SITE_NAME,
+      description: SITE_DESCRIPTION,
+      canonicalUrl,
+      ogType: 'website',
+      imageUrl: DEFAULT_SITE_IMAGE,
+      twitterCard: 'summary_large_image',
+      jsonLd: getViewerWebsiteJsonLd(canonicalUrl || baseUrl),
+    });
+  },
   component: App,
 });
 

@@ -1,6 +1,8 @@
 import { Link } from '@tanstack/react-router';
 import { Github } from 'lucide-react';
 
+import { SITE_NAME } from '#/lib/site-config';
+
 interface HeaderProps {
   materialFilter: string;
   shownMaterialCount: number;
@@ -32,7 +34,7 @@ export default function Header({
             search={(prev) => ({ materials: prev.materials })}
             to="/"
           >
-            MaterialX Fidelity Test Suite
+            {SITE_NAME}
           </Link>
           <a
             aria-label="MaterialX Fidelity Testing repository"
