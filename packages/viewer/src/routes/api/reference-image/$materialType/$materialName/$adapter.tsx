@@ -16,7 +16,7 @@ export const Route = createFileRoute('/api/reference-image/$materialType/$materi
           status: 200,
           headers: {
             'Content-Type': 'image/png',
-            'Cache-Control': 'public, max-age=300',
+            'Cache-Control': `public, max-age=${3600}`,
           },
         });
       },
