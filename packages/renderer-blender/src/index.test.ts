@@ -131,7 +131,15 @@ describe('blender renderer', () => {
 
   it('passes render options to Blender and captures logs', async () => {
     mockSuccessfulPrerequisites();
-    mockSpawnExit(0, 'render started\nrender finished\n');
+    mockSpawnExit(
+      0,
+      [
+        '00:00.302  blend            | Read blend: "/tmp/material-fidelity-blender-abc/template.blend"',
+        "00:04.658  render           | Saved: '/tmp/example/blender-temp.png'",
+        'render started',
+        'render finished',
+      ].join('\n'),
+    );
     const thirdPartyRoot = await makeTempDir('blender-third-party-');
     const viewerRoot = path.join(thirdPartyRoot, 'material-samples', 'viewer');
     const materialsRoot = path.join(thirdPartyRoot, 'material-samples', 'materials', 'example');

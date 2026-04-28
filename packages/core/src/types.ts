@@ -47,6 +47,7 @@ export interface CreateReferencesOptions {
   rendererNames?: string[];
   materialSelectors?: string[];
   concurrency: number;
+  skipExisting?: boolean;
   filter?: string;
   shouldStop?: () => boolean;
   onPlan?: (event: CreateReferencesPlanEvent) => void | Promise<void>;

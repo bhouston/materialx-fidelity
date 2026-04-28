@@ -66,6 +66,7 @@ Optional flags:
 - `--renderers <name[,name...]>` optional renderer filter; supports repeated flags and comma-separated values
 - `--materials <selector[,selector...]>` optional material filter; matches against each material directory name only (leaf directory), supports repeated flags, comma-separated values, substring matches, and regex selectors (`re:...` or `/.../flags`)
 - `--concurrency <number>` optional render concurrency; defaults to the recommended available parallelism, with a minimum of `1`
+- `--skip-existing` only render renderer/material pairs whose `<renderer-name>.png` output does not already exist
 
 ## Material Organization
 

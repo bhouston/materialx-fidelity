@@ -249,6 +249,48 @@ describe('createReferences', () => {
     expect(result.failures).toHaveLength(0);
   });
 
+  it('skips renderer/sample pairs that already have a png when skipExisting is enabled', async () => {
+    const root = await makeTempDir('fidelity-');
+    const thirdPartyRoot = path.join(root, 'third-party');
+    const samplesRoot = path.join(thirdPartyRoot, 'material-samples');
+    const existingDir = path.join(samplesRoot, 'materials', 'surfaces', 'standard_surface', 'existing');
+    const missingDir = path.join(samplesRoot, 'materials', 'surfaces', 'standard_surface', 'missing');
+    const viewerDir = path.join(samplesRoot, 'viewer');
+    const renderer = createPngWriterRenderer(NON_BLACK_PIXEL_PNG_BASE64, 'fake');
+    const skippedRenderer = createFailingPrerequisiteRenderer('alt');
+    renderer.generateImage = vi.fn(renderer.generateImage);
+
+    await mkdir(existingDir, { recursive: true });
+    await mkdir(missingDir, { recursive: true });
+    await mkdir(viewerDir, { recursive: true });
+    await writeFile(materialMtlxPath(existingDir), VALID_MTLX_DOCUMENT, 'utf8');
+    await writeFile(materialMtlxPath(missingDir), VALID_MTLX_DOCUMENT, 'utf8');
+    await writeFile(path.join(viewerDir, 'san_giuseppe_bridge_2k.hdr'), 'hdr', 'utf8');
+    await writeFile(path.join(viewerDir, 'ShaderBall.glb'), 'glb', 'utf8');
+    await writeFile(path.join(existingDir, 'fake.png'), BLACK_PIXEL_PNG_BUFFER);
+    await writeFile(path.join(existingDir, 'alt.png'), BLACK_PIXEL_PNG_BUFFER);
+    await writeFile(path.join(missingDir, 'alt.png'), BLACK_PIXEL_PNG_BUFFER);
+
+    const result = await createReferences({
+      thirdPartyRoot,
+      renderers: [renderer, skippedRenderer],
+      rendererNames: ['fake', 'alt'],
+      concurrency: 1,
+      skipExisting: true,
+    });
+
+    expect(result.total).toBe(1);
+    expect(result.attempted).toBe(1);
+    expect(result.rendered).toBe(1);
+    expect(result.failures).toHaveLength(0);
+    expect(renderer.generateImage).toHaveBeenCalledTimes(1);
+    expect(renderer.generateImage).toHaveBeenCalledWith(
+      expect.objectContaining({ mtlxPath: materialMtlxPath(missingDir) }),
+    );
+    expect((await readFile(path.join(existingDir, 'fake.png'))).equals(BLACK_PIXEL_PNG_BUFFER)).toBe(true);
+    await expect(access(path.join(missingDir, 'fake.png'))).resolves.toBeUndefined();
+  });
+
   it('requires the expected viewer hdr and mesh filenames', async () => {
     const root = await makeTempDir('fidelity-');
     const thirdPartyRoot = path.join(root, 'third-party');

@@ -98,6 +98,8 @@ describe('render command', () => {
       await command.handler({
         renderers: ['materialxview'],
         materials: undefined,
+        'skip-existing': false,
+        skipExisting: false,
         filter: undefined,
         concurrency: 2,
         _: [],
@@ -119,6 +121,7 @@ describe('render command', () => {
       rendererNames: ['materialxview'],
       thirdPartyRoot: expect.any(String),
       concurrency: 2,
+      skipExisting: false,
     });
     expect(firstCall?.[0].thirdPartyRoot.endsWith('/third_party')).toBe(true);
     expect(firstCall?.[0].renderers).toHaveLength(5);
@@ -130,6 +133,8 @@ describe('render command', () => {
     const argv = {
       renderers: undefined,
       materials: undefined,
+      'skip-existing': false,
+      skipExisting: false,
       filter: undefined,
       concurrency: undefined,
       _: [],
@@ -151,6 +156,8 @@ describe('render command', () => {
     const argv = {
       renderers: undefined,
       materials: undefined,
+      'skip-existing': false,
+      skipExisting: false,
       filter: undefined,
       concurrency: undefined,
       _: [],
@@ -170,6 +177,8 @@ describe('render command', () => {
     await command.handler({
       renderers: ['materialxview,threejs-new'],
       materials: ['standard_surface', '/gltf_pbr/i'],
+      'skip-existing': false,
+      skipExisting: false,
       filter: 'stdlib',
       concurrency: 1,
       _: [],
@@ -188,6 +197,8 @@ describe('render command', () => {
     await command.handler({
       renderers: undefined,
       materials: undefined,
+      'skip-existing': false,
+      skipExisting: false,
       filter: undefined,
       concurrency: 1,
       _: [],
@@ -199,6 +210,25 @@ describe('render command', () => {
     expect(firstCall?.[0]).toMatchObject({
       rendererNames: [],
       materialSelectors: [],
+    });
+  });
+
+  it('passes skipExisting through to core createReferences', async () => {
+    await command.handler({
+      renderers: undefined,
+      materials: undefined,
+      'skip-existing': true,
+      skipExisting: true,
+      filter: undefined,
+      concurrency: 1,
+      _: [],
+      $0: 'cli',
+    });
+
+    const [firstCall] = createReferencesMock.mock.calls;
+    expect(firstCall).toBeDefined();
+    expect(firstCall?.[0]).toMatchObject({
+      skipExisting: true,
     });
   });
 });

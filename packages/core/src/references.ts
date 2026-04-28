@@ -165,25 +165,6 @@ export async function createReferences(options: CreateReferencesOptions): Promis
   }
   await options.onPlan?.({ materialPaths: selectedMaterialFiles });
 
-  const hdrPath = path.join(viewerRoot, VIEWER_HDR_FILENAME);
-  const modelPath = path.join(viewerRoot, VIEWER_MODEL_FILENAME);
-  const missingViewerAssets: string[] = [];
-
-  try {
-    await access(hdrPath);
-  } catch {
-    missingViewerAssets.push(VIEWER_HDR_FILENAME);
-  }
-
-  try {
-    await access(modelPath);
-  } catch {
-    missingViewerAssets.push(VIEWER_MODEL_FILENAME);
-  }
-  if (missingViewerAssets.length > 0) {
-    throw new Error(`Missing required viewer assets under ${viewerRoot}: ${missingViewerAssets.join(', ')}.`);
-  }
-
   const rendererMap = new Map<string, FidelityRenderer>();
   for (const renderer of options.renderers) {
     if (rendererMap.has(renderer.name)) {
@@ -211,8 +192,55 @@ export async function createReferences(options: CreateReferencesOptions): Promis
   const selectedRenderers = selectedRendererNames.map(
     (rendererName) => rendererMap.get(rendererName) as FidelityRenderer,
   );
+  const selectedRenderQueue = selectedMaterialFiles.flatMap((materialPath) =>
+    selectedRenderers.map((renderer) => ({ materialPath, renderer })),
+  );
+  const renderQueue = options.skipExisting
+    ? (
+        await Promise.all(
+          selectedRenderQueue.map(async (entry) => ({
+            ...entry,
+            outputExists: await fileExists(createOutputPath(entry.materialPath, entry.renderer.name)),
+          })),
+        )
+      )
+        .filter((entry) => !entry.outputExists)
+        .map(({ materialPath, renderer }) => ({ materialPath, renderer }))
+    : selectedRenderQueue;
+  if (renderQueue.length === 0) {
+    return {
+      rendererNames: selectedRenderers.map((renderer) => renderer.name),
+      total: 0,
+      attempted: 0,
+      rendered: 0,
+      failures: [],
+      stopped: false,
+    };
+  }
+  const rendererNamesInQueue = new Set(renderQueue.map((entry) => entry.renderer.name));
+  const renderersToRun = selectedRenderers.filter((renderer) => rendererNamesInQueue.has(renderer.name));
+
+  const hdrPath = path.join(viewerRoot, VIEWER_HDR_FILENAME);
+  const modelPath = path.join(viewerRoot, VIEWER_MODEL_FILENAME);
+  const missingViewerAssets: string[] = [];
+
+  try {
+    await access(hdrPath);
+  } catch {
+    missingViewerAssets.push(VIEWER_HDR_FILENAME);
+  }
+
+  try {
+    await access(modelPath);
+  } catch {
+    missingViewerAssets.push(VIEWER_MODEL_FILENAME);
+  }
+  if (missingViewerAssets.length > 0) {
+    throw new Error(`Missing required viewer assets under ${viewerRoot}: ${missingViewerAssets.join(', ')}.`);
+  }
+
   const failedRendererChecks: string[] = [];
-  for (const renderer of selectedRenderers) {
+  for (const renderer of renderersToRun) {
     const checkResult = await renderer.checkPrerequisites();
     if (!checkResult.success) {
       failedRendererChecks.push(
@@ -236,9 +264,6 @@ export async function createReferences(options: CreateReferencesOptions): Promis
   let attempted = 0;
   let stopped = false;
   const shouldStop = (): boolean => options.shouldStop?.() === true;
-  const renderQueue = selectedMaterialFiles.flatMap((materialPath) =>
-    selectedRenderers.map((renderer) => ({ materialPath, renderer })),
-  );
   const materialValidationCache = new Map<string, Promise<PreflightResult>>();
   const getMaterialValidation = (materialPath: string): Promise<PreflightResult> => {
     const existing = materialValidationCache.get(materialPath);
@@ -259,7 +284,7 @@ export async function createReferences(options: CreateReferencesOptions): Promis
   let renderPipelineError: Error | undefined;
   let shutdownError: Error | undefined;
   try {
-    for (const renderer of selectedRenderers) {
+    for (const renderer of renderersToRun) {
       await renderer.start({
         modelPath,
         environmentHdrPath: hdrPath,

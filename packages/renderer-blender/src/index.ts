@@ -96,7 +96,15 @@ function collectOutputLines(value: string, level: RenderLogEntry['level']): Rend
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter((line) => line.length > 0)
+    .filter((message) => shouldIncludeRendererLogMessage(message))
     .map((message) => ({ level, source: 'renderer', message }));
+}
+
+function shouldIncludeRendererLogMessage(message: string): boolean {
+  return !(
+    /^\d{2}:\d{2}\.\d{3}\s+blend\s+\|\s+Read blend:/.test(message) ||
+    /^\d{2}:\d{2}\.\d{3}\s+render\s+\|\s+Saved:/.test(message)
+  );
 }
 
 function checkBlenderRuntime(executable: string): RendererPrerequisiteCheckResult {
@@ -162,6 +170,9 @@ function execute(executable: string, args: string[]): Promise<RenderLogEntry[]> 
       for (const line of lines) {
         const message = line.trim();
         if (!message) {
+          continue;
+        }
+        if (!shouldIncludeRendererLogMessage(message)) {
           continue;
         }
         logs.push({ level, source: 'renderer', message });

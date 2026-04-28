@@ -113,6 +113,7 @@ interface InkCreateReferencesAppProps {
     rendererNames: string[];
     concurrency: number;
     materialSelectors: string[];
+    skipExisting: boolean;
     filter?: string;
   };
   onComplete: (result: CreateReferencesResult) => void;
@@ -189,6 +190,7 @@ function InkCreateReferencesApp({ args, onComplete, onError }: InkCreateReferenc
       rendererNames: args.rendererNames,
       concurrency: args.concurrency,
       materialSelectors: args.materialSelectors,
+      skipExisting: args.skipExisting,
       filter: args.filter,
       shouldStop: () => stopRequestedRef.current,
       onPlan: (event) => {
@@ -291,6 +293,11 @@ export const command = defineCommand({
         describe:
           'Material selectors matched against material directory names. Supports repeated values, comma-separated values, or regex (`re:...` or `/.../flags`).',
       })
+      .option('skip-existing', {
+        type: 'boolean',
+        default: false,
+        describe: 'Only render outputs whose renderer/sample PNG does not already exist.',
+      })
       .option('filter', {
         type: 'string',
         describe: 'Deprecated alias for --materials with a single substring selector.',
@@ -316,6 +323,7 @@ export const command = defineCommand({
       rendererNames: normalizeRendererNames(argv.renderers),
       concurrency: Math.max(1, argv.concurrency ?? getDefaultConcurrency()),
       materialSelectors: [...new Set(materialSelectors)],
+      skipExisting: argv.skipExisting ?? false,
       filter: argv.filter,
     };
     const materialsRoot = path.join(thirdPartyRoot, 'material-samples', 'materials');
