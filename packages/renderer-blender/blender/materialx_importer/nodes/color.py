@@ -5,6 +5,7 @@ from typing import Any
 from ..blender_nodes import (
     alpha_socket,
     apply_gamma,
+    clamp01_component,
     clamp_component,
     combine_components,
     component_binary_math,
@@ -26,6 +27,7 @@ from ..values import component_count
 def register(registry) -> None:
     registry.register("saturate", compile_saturate)
     registry.register("rgbtohsv", compile_rgbtohsv)
+    registry.register("hsvtorgb", compile_hsvtorgb)
     registry.register("unpremult", compile_unpremult)
     registry.register("colorcorrect", compile_colorcorrect)
     registry.register("blackbody", compile_blackbody)
@@ -85,6 +87,36 @@ def compile_rgbtohsv(context: CompileContext, node: Any, output_name: str, scope
     hue = math_socket(context, "ADD", hue, hue_negative.outputs[0])
     hue = math_socket(context, "MULTIPLY", hue, step_component(context, constant_socket(context, 1e-6, "float").socket, delta))
     return combine_components(context, [hue, saturation, max_comp], type_name(node) or "color3")
+
+
+def compile_hsvtorgb(context: CompileContext, node: Any, output_name: str, scope: Any | None) -> CompiledSocket | None:
+    source = input_socket(context, node, "in", (0.0, 0.0, 0.0), scope)
+    hue = component_socket(context, source, 0)
+    saturation = component_socket(context, source, 1)
+    value = component_socket(context, source, 2)
+    components = [
+        hsv_channel_socket(context, hue, saturation, value, 1.0),
+        hsv_channel_socket(context, hue, saturation, value, 2.0 / 3.0),
+        hsv_channel_socket(context, hue, saturation, value, 1.0 / 3.0),
+    ]
+    return combine_components(context, components, type_name(node) or "color3")
+
+
+def hsv_channel_socket(
+    context: CompileContext,
+    hue: Any,
+    saturation: Any,
+    value: Any,
+    offset: float,
+) -> Any:
+    hue_offset = math_socket(context, "ADD", hue, constant_socket(context, offset, "float").socket)
+    wrapped = math_socket(context, "FRACT", hue_offset, None)
+    scaled = math_socket(context, "MULTIPLY", wrapped, constant_socket(context, 6.0, "float").socket)
+    centered = math_socket(context, "SUBTRACT", scaled, constant_socket(context, 3.0, "float").socket)
+    triangle = math_socket(context, "SUBTRACT", math_socket(context, "ABSOLUTE", centered, None), constant_socket(context, 1.0, "float").socket)
+    chroma = clamp01_component(context, triangle)
+    mixed = mix_component(context, constant_socket(context, 1.0, "float").socket, chroma, saturation)
+    return math_socket(context, "MULTIPLY", value, mixed)
 
 
 def compile_unpremult(context: CompileContext, node: Any, output_name: str, scope: Any | None) -> CompiledSocket | None:

@@ -56,6 +56,14 @@ class GraphCompiler:
                 return None
             return self.compile_input(output, nodegraph)
 
+        interface_name = attribute(input_element, "interfacename")
+        if interface_name and scope is not None:
+            interface_input = get_input(scope, interface_name)
+            if interface_input is None:
+                self.context.warnings.append(f"Interface input not found on {scope.getName()}: {interface_name}")
+                return None
+            return self.compile_input(interface_input, scope)
+
         connected = connected_node(self.context.document, input_element, scope=scope)
         if connected is not None:
             return self.compile_node(connected, attribute(input_element, "output") or "out", scope)

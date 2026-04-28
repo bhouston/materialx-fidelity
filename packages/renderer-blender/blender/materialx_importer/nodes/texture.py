@@ -13,13 +13,15 @@ from ..blender_nodes import (
     math_socket,
     rotate2d_components,
 )
-from ..document import category, get_input, input_value, type_name
+from ..document import attribute, category, get_input, input_value, type_name
 from ..types import CompileContext, CompiledSocket
 from ..values import parse_float, resolve_asset_path
 
 
 def register(registry) -> None:
     registry.register_many({"image", "tiledimage"}, compile_image)
+    registry.register_many({"gltf_image", "gltf_colorimage"}, compile_gltf_image)
+    registry.register("gltf_normalmap", compile_gltf_normalmap)
     registry.register("place2d", compile_place2d)
     registry.register("normalmap", compile_normalmap)
     registry.register("circle", compile_circle)
@@ -27,6 +29,59 @@ def register(registry) -> None:
 
 
 def compile_image(context: CompileContext, image_node: Any, output_name: str, scope: Any | None) -> CompiledSocket | None:
+    texture_node = create_image_texture_node(context, image_node, scope)
+    if texture_node is None:
+        return None
+
+    if output_name in {"outa", "a", "alpha"}:
+        socket = texture_node.outputs.get("Alpha")
+        return CompiledSocket(socket, "float") if socket is not None else None
+    socket = texture_node.outputs.get("Color")
+    return CompiledSocket(socket, type_name(image_node) or "color3") if socket is not None else None
+
+
+def compile_gltf_image(context: CompileContext, image_node: Any, output_name: str, scope: Any | None) -> CompiledSocket | None:
+    texture_node = create_image_texture_node(
+        context,
+        image_node,
+        scope,
+        non_color_default=type_name(image_node) == "vector3",
+    )
+    if texture_node is None:
+        return None
+
+    if output_name in {"outa", "a", "alpha"}:
+        socket = texture_node.outputs.get("Alpha")
+        return CompiledSocket(socket, "float") if socket is not None else None
+    socket = texture_node.outputs.get("Color")
+    if socket is None:
+        return None
+    output_type = "color3" if category(image_node) == "gltf_colorimage" else type_name(image_node) or "color3"
+    return CompiledSocket(socket, output_type)
+
+
+def compile_gltf_normalmap(context: CompileContext, image_node: Any, output_name: str, scope: Any | None) -> CompiledSocket | None:
+    texture_node = create_image_texture_node(context, image_node, scope, non_color_default=True)
+    if texture_node is None:
+        return None
+
+    color_socket = texture_node.outputs.get("Color")
+    if color_socket is None:
+        return None
+    normal_map = context.material.node_tree.nodes.new(type="ShaderNodeNormalMap")
+    context.material.node_tree.links.new(color_socket, normal_map.inputs["Color"])
+    connect_or_set_input(context, image_node, "scale", normal_map.inputs["Strength"], 1.0, scope)
+    socket = normal_map.outputs.get("Normal")
+    return CompiledSocket(socket, "vector3") if socket is not None else None
+
+
+def create_image_texture_node(
+    context: CompileContext,
+    image_node: Any,
+    scope: Any | None,
+    *,
+    non_color_default: bool = False,
+) -> bpy.types.Node | None:
     file_input = get_input(image_node, "file")
     file_value = input_value(file_input) if file_input is not None else None
     if not file_value:
@@ -47,6 +102,7 @@ def compile_image(context: CompileContext, image_node: Any, output_name: str, sc
     texture_node = context.material.node_tree.nodes.new(type="ShaderNodeTexImage")
     texture_node.image = image
     texture_node.label = f"MaterialX {image_node.getName()}"
+    configure_image_colorspace(texture_node, image_node, non_color_default)
     configure_image_sampling(texture_node, image_node)
 
     texcoord = image_texcoord_socket(context, image_node, scope)
@@ -56,11 +112,18 @@ def compile_image(context: CompileContext, image_node: Any, output_name: str, sc
     if vector_input is not None:
         context.material.node_tree.links.new(texcoord.socket, vector_input)
 
-    if output_name in {"outa", "a", "alpha"}:
-        socket = texture_node.outputs.get("Alpha")
-        return CompiledSocket(socket, "float") if socket is not None else None
-    socket = texture_node.outputs.get("Color")
-    return CompiledSocket(socket, type_name(image_node) or "color3") if socket is not None else None
+    return texture_node
+
+
+def configure_image_colorspace(texture_node: bpy.types.Node, image_node: Any, non_color_default: bool) -> None:
+    image = texture_node.image
+    if image is None:
+        return
+
+    file_input = get_input(image_node, "file")
+    color_space = (attribute(file_input, "colorspace") or "").lower()
+    if non_color_default and not color_space:
+        set_image_colorspace(image, ("Non-Color", "Non-Color Data"))
 
 
 def configure_image_sampling(texture_node: bpy.types.Node, image_node: Any) -> None:
@@ -84,6 +147,15 @@ def configure_image_sampling(texture_node: bpy.types.Node, image_node: Any) -> N
     extension = extension_by_mode.get(u_mode)
     if extension is not None:
         texture_node.extension = extension
+
+
+def set_image_colorspace(image: bpy.types.Image, names: tuple[str, ...]) -> None:
+    for name in names:
+        try:
+            image.colorspace_settings.name = name
+            return
+        except Exception:
+            continue
 
 
 def image_texcoord_socket(context: CompileContext, image_node: Any, scope: Any | None) -> CompiledSocket:
