@@ -52,8 +52,8 @@ def apply_standard_surface_inputs(context: CompileContext, surface_node: Any, pr
         "metalness": ("Metallic",),
         "diffuse_roughness": ("Diffuse Roughness",),
         "specular_roughness": ("Roughness",),
-        "specular_IOR": ("Specular IOR Level",),
-        "specular_ior": ("Specular IOR Level",),
+        "specular_IOR": ("IOR",),
+        "specular_ior": ("IOR",),
         "specular_anisotropy": ("Anisotropic", "Specular Anisotropy"),
         "specular_rotation": ("Anisotropic Rotation", "Specular Rotation"),
         "transmission": ("Transmission Weight", "Transmission"),
@@ -87,6 +87,8 @@ def apply_standard_surface_inputs(context: CompileContext, surface_node: Any, pr
     }.items():
         connect_or_set_surface_input(context, surface_node, principled, input_name, socket_names, "color")
 
+    apply_static_transmission_tint(context, surface_node, principled, "transmission", "transmission_color")
+    configure_transmission_material(context, surface_node, "transmission")
     apply_opacity_input(context, surface_node, principled, "opacity", "BLEND")
 
 
@@ -94,6 +96,9 @@ def apply_gltf_pbr_surface_inputs(context: CompileContext, surface_node: Any, pr
     for input_name, socket_names in {
         "metallic": ("Metallic",),
         "roughness": ("Roughness",),
+        "transmission": ("Transmission Weight", "Transmission"),
+        "ior": ("IOR",),
+        "specular": ("Specular IOR Level",),
     }.items():
         connect_or_set_surface_input(context, surface_node, principled, input_name, socket_names, "scalar")
 
@@ -103,6 +108,8 @@ def apply_gltf_pbr_surface_inputs(context: CompileContext, surface_node: Any, pr
     }.items():
         connect_or_set_surface_input(context, surface_node, principled, input_name, socket_names, "color")
 
+    apply_static_transmission_tint(context, surface_node, principled, "transmission", "attenuation_color")
+    configure_transmission_material(context, surface_node, "transmission")
     apply_gltf_alpha_inputs(context, surface_node, principled)
     connect_or_set_surface_input(context, surface_node, principled, "normal", ("Normal",), "vector", connected_only=True)
 
@@ -192,12 +199,13 @@ def apply_open_pbr_surface_inputs(context: CompileContext, surface_node: Any, pr
     }.items():
         connect_or_set_surface_input(context, surface_node, principled, input_name, socket_names, "vector")
 
+    apply_static_transmission_tint(context, surface_node, principled, "transmission_weight", "transmission_color")
+    configure_transmission_material(context, surface_node, "transmission_weight")
     apply_opacity_input(context, surface_node, principled, "geometry_opacity", "BLEND")
     warn_unsupported_inputs(
         context,
         surface_node,
         {
-            "transmission_color",
             "transmission_depth",
             "transmission_scatter",
             "transmission_scatter_anisotropy",
@@ -319,6 +327,45 @@ def multiply_inputs_to_socket(
     ]
     multiplied_vector = combine_components(context, components, default_type_for_component_count(component_total))
     context.material.node_tree.links.new(multiplied_vector.socket, socket)
+
+
+def apply_static_transmission_tint(
+    context: CompileContext,
+    surface_node: Any,
+    principled: bpy.types.Node,
+    weight_name: str,
+    color_name: str,
+) -> None:
+    if not is_static_input(surface_node, weight_name) or not is_static_input(surface_node, color_name):
+        return
+
+    weight = static_scalar_input(surface_node, weight_name, 0.0)
+    if weight <= 0.0:
+        return
+
+    socket = principled_input(principled, ("Base Color",))
+    if socket is None or len(socket.links) > 0:
+        return
+
+    tint = static_color_input(surface_node, color_name, (1.0, 1.0, 1.0, 1.0))
+    current = tuple(socket.default_value)
+    mixed = tuple(
+        current[index] * (1.0 - weight) + tint[index] * weight
+        for index in range(3)
+    )
+    set_color_socket(principled, socket.name, (mixed[0], mixed[1], mixed[2], current[3]))
+
+
+def configure_transmission_material(context: CompileContext, surface_node: Any, input_name: str) -> None:
+    input_element = get_input(surface_node, input_name)
+    if input_element is None and get_declaration_input(surface_node, input_name) is None:
+        return
+
+    is_transmissive = is_connected(input_element) or static_scalar_input(surface_node, input_name, 0.0) > 0.0
+    if not is_transmissive:
+        return
+
+    configure_alpha_material(context.material, "BLEND")
 
 
 def principled_input(principled: bpy.types.Node, socket_names: tuple[str, ...]) -> bpy.types.NodeSocket | None:

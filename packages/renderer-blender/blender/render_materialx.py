@@ -59,20 +59,20 @@ CYCLES_RENDER_PROFILES = {
     "default": {
         "samples": 32,
         "adaptive_threshold": 0.02,
-        "max_bounces": 4,
+        "max_bounces": 8,
         "diffuse_bounces": 2,
         "glossy_bounces": 2,
-        "transmission_bounces": 4,
+        "transmission_bounces": 8,
         "transparent_max_bounces": 4,
     },
     "fast": {
         "samples": 8,
         "adaptive_threshold": 0.05,
-        "max_bounces": 2,
-        "diffuse_bounces": 1,
-        "glossy_bounces": 1,
-        "transmission_bounces": 4,
-        "transparent_max_bounces": 4,
+        "max_bounces": 20,
+        "diffuse_bounces": 5,
+        "glossy_bounces": 5,
+        "transmission_bounces": 20,
+        "transparent_max_bounces": 20,
     },
 }
 _T = TypeVar("_T")
