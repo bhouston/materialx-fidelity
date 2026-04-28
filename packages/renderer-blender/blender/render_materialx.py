@@ -13,7 +13,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from materialx_to_blender import load_materialx_as_blender_material
+from materialx_importer import load_materialx_as_blender_material
 
 IDEAL_MESH_SPHERE_RADIUS = 2.0
 ENVIRONMENT_ROTATION_DEGREES = 90.0
