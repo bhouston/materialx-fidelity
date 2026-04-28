@@ -12,6 +12,12 @@ const RENDERER_METADATA_BY_NAME: Record<string, RendererMetadata> = {
     packageUrl: 'https://github.com/bhouston/material-fidelity/tree/main/packages/renderer-blender',
     observerDescription: "Custom MaterialX loader for Blender Cycles",
   },
+  'blender-io-mtlx': {
+    rendererName: 'blender-io-mtlx',
+    packageName: '@material-fidelity/renderer-blender',
+    packageUrl: 'https://github.com/bhouston/material-fidelity/tree/main/packages/renderer-blender',
+    observerDescription: 'io_blender_mtlx MaterialX add-on rendered through Blender Cycles',
+  },
   materialxview: {
     rendererName: 'materialxview',
     packageName: '@material-fidelity/renderer-materialxview',

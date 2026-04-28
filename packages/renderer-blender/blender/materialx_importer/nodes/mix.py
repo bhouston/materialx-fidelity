@@ -4,7 +4,14 @@ from typing import Any
 
 import bpy
 
-from ..blender_nodes import combine_components, component_socket, constant_socket, input_socket, math_socket
+from ..blender_nodes import (
+    combine_components,
+    component_socket,
+    constant_socket,
+    input_socket,
+    math_socket,
+    step_component,
+)
 from ..document import category, type_name
 from ..types import CompileContext, CompiledSocket
 from ..values import component_count
@@ -13,6 +20,8 @@ from ..values import component_count
 def register(registry) -> None:
     registry.register("mix", compile_mix_like)
     registry.register("minus", compile_mix_like)
+    registry.register("difference", compile_mix_like)
+    registry.register("burn", compile_burn)
     registry.register_many({"ifgreater", "ifgreatereq", "ifequal"}, compile_conditional)
 
 
@@ -34,11 +43,55 @@ def compile_mix_like(context: CompileContext, node: Any, output_name: str, scope
             one_minus_mix = math_socket(context, "SUBTRACT", constant_socket(context, 1.0, "float").socket, mix_component)
             retained_bg = math_socket(context, "MULTIPLY", one_minus_mix, bg_component)
             result_components.append(math_socket(context, "ADD", mixed_diff, retained_bg))
+        elif mode == "difference":
+            diff = math_socket(context, "ABSOLUTE", math_socket(context, "SUBTRACT", bg_component, fg_component), None)
+            mixed_diff = math_socket(context, "MULTIPLY", mix_component, diff)
+            retained_bg = math_socket(
+                context,
+                "MULTIPLY",
+                math_socket(context, "SUBTRACT", constant_socket(context, 1.0, "float").socket, mix_component),
+                bg_component,
+            )
+            result_components.append(math_socket(context, "ADD", mixed_diff, retained_bg))
         else:
             one_minus_mix = math_socket(context, "SUBTRACT", constant_socket(context, 1.0, "float").socket, mix_component)
             bg_part = math_socket(context, "MULTIPLY", bg_component, one_minus_mix)
             fg_part = math_socket(context, "MULTIPLY", fg_component, mix_component)
             result_components.append(math_socket(context, "ADD", bg_part, fg_part))
+    return combine_components(context, result_components, output_type)
+
+
+def compile_burn(context: CompileContext, node: Any, output_name: str, scope: Any | None) -> CompiledSocket | None:
+    output_type = type_name(node) or "float"
+    fg = input_socket(context, node, "fg", 0.0, scope)
+    bg = input_socket(context, node, "bg", 0.0, scope)
+    mix_socket = input_socket(context, node, "mix", 1.0, scope)
+    one = constant_socket(context, 1.0, "float").socket
+    epsilon = constant_socket(context, 1e-6, "float").socket
+    result_components: list[bpy.types.NodeSocket] = []
+    for index in range(component_count(output_type)):
+        fg_component = component_socket(context, fg, index)
+        bg_component = component_socket(context, bg, index)
+        mix_component = component_socket(context, mix_socket, index)
+        fg_abs = math_socket(context, "ABSOLUTE", fg_component, None)
+        fg_present = step_component(context, epsilon, fg_abs)
+        safe_fg = math_socket(
+            context,
+            "ADD",
+            math_socket(context, "MULTIPLY", fg_component, fg_present),
+            math_socket(context, "SUBTRACT", one, fg_present),
+        )
+        burned = math_socket(
+            context,
+            "SUBTRACT",
+            one,
+            math_socket(context, "DIVIDE", math_socket(context, "SUBTRACT", one, bg_component), safe_fg),
+        )
+        burned_part = math_socket(context, "MULTIPLY", mix_component, burned)
+        retained_part = math_socket(context, "MULTIPLY", math_socket(context, "SUBTRACT", one, mix_component), bg_component)
+        result_components.append(
+            math_socket(context, "MULTIPLY", math_socket(context, "ADD", burned_part, retained_part), fg_present)
+        )
     return combine_components(context, result_components, output_type)
 
 

@@ -7,9 +7,9 @@ from .blender_nodes import constant_socket
 from .document import attribute, category, connected_node, get_input, get_output, input_value, type_name
 from .nodes import register_all
 from .nodes.geometry import compile_geometry_category
-from .types import CompileContext, CompiledSocket
+from .types import CompileContext, CompiledValue
 
-NodeHandler = Callable[[CompileContext, Any, str, Any | None], CompiledSocket | None]
+NodeHandler = Callable[[CompileContext, Any, str, Any | None], CompiledValue | None]
 
 
 class NodeRegistry:
@@ -43,7 +43,7 @@ class GraphCompiler:
         self.registry = registry or create_default_registry()
         self.context.compiler = self
 
-    def compile_input(self, input_element: Any, scope: Any | None = None) -> CompiledSocket | None:
+    def compile_input(self, input_element: Any, scope: Any | None = None) -> CompiledValue | None:
         nodegraph_name = attribute(input_element, "nodegraph")
         if nodegraph_name:
             nodegraph = self.context.document.getChild(nodegraph_name)
@@ -65,8 +65,8 @@ class GraphCompiler:
             return None
         return constant_socket(self.context, value, type_name(input_element))
 
-    def compile_node(self, node: Any, output_name: str = "out", scope: Any | None = None) -> CompiledSocket | None:
-        key = (id(node), output_name)
+    def compile_node(self, node: Any, output_name: str = "out", scope: Any | None = None) -> CompiledValue | None:
+        key = self._cache_key(node, output_name, scope)
         cached = self.context.cache.get(key)
         if cached is not None:
             return cached
@@ -90,5 +90,22 @@ class GraphCompiler:
         self.context.cache[key] = compiled
         return compiled
 
-    def compile_geometry(self, category_name: str) -> CompiledSocket | None:
+    def compile_geometry(self, category_name: str) -> CompiledValue | None:
         return compile_geometry_category(self.context, category_name)
+
+    def _cache_key(self, node: Any, output_name: str, scope: Any | None) -> tuple[str, str, str]:
+        return (_stable_element_name(node), output_name, _stable_element_name(scope) if scope is not None else "")
+
+
+def _stable_element_name(element: Any) -> str:
+    for method_name in ("getNamePath", "getName"):
+        method = getattr(element, method_name, None)
+        if method is None:
+            continue
+        try:
+            value = method()
+        except Exception:
+            continue
+        if value:
+            return str(value)
+    return str(id(element))

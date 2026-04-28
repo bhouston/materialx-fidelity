@@ -22,6 +22,8 @@ def register(registry) -> None:
     registry.register_many({"image", "tiledimage"}, compile_image)
     registry.register("place2d", compile_place2d)
     registry.register("normalmap", compile_normalmap)
+    registry.register("circle", compile_circle)
+    registry.register("bump", compile_bump)
 
 
 def compile_image(context: CompileContext, image_node: Any, output_name: str, scope: Any | None) -> CompiledSocket | None:
@@ -177,4 +179,40 @@ def compile_normalmap(context: CompileContext, node: Any, output_name: str, scop
     connect_or_set_input(context, node, "in", normal_map.inputs["Color"], (0.5, 0.5, 1.0), scope)
     connect_or_set_input(context, node, "scale", normal_map.inputs["Strength"], 1.0, scope)
     socket = normal_map.outputs.get("Normal")
+    return CompiledSocket(socket, "vector3") if socket is not None else None
+
+
+def compile_circle(context: CompileContext, node: Any, output_name: str, scope: Any | None) -> CompiledSocket | None:
+    texcoord = image_texcoord_socket(context, node, scope)
+    center = input_socket(context, node, "center", (0.0, 0.0), scope)
+    radius = input_socket(context, node, "radius", 0.5, scope)
+    delta = [
+        math_socket(
+            context,
+            "SUBTRACT",
+            component_socket(context, texcoord, index),
+            component_socket(context, center, index),
+        )
+        for index in range(2)
+    ]
+    dist_square = math_socket(
+        context,
+        "ADD",
+        math_socket(context, "MULTIPLY", delta[0], delta[0]),
+        math_socket(context, "MULTIPLY", delta[1], delta[1]),
+    )
+    radius_square = math_socket(context, "MULTIPLY", radius.socket, radius.socket)
+    outside = math_socket(context, "LESS_THAN", radius_square, dist_square)
+    inside = math_socket(context, "SUBTRACT", constant_socket(context, 1.0, "float").socket, outside)
+    return CompiledSocket(inside, "float")
+
+
+def compile_bump(context: CompileContext, node: Any, output_name: str, scope: Any | None) -> CompiledSocket | None:
+    bump = context.material.node_tree.nodes.new(type="ShaderNodeBump")
+    connect_or_set_input(context, node, "height", bump.inputs["Height"], 0.0, scope)
+    connect_or_set_input(context, node, "scale", bump.inputs["Strength"], 1.0, scope)
+    normal_input = bump.inputs.get("Normal")
+    if normal_input is not None:
+        connect_or_set_input(context, node, "normal", normal_input, (0.0, 0.0, 1.0), scope)
+    socket = bump.outputs.get("Normal")
     return CompiledSocket(socket, "vector3") if socket is not None else None

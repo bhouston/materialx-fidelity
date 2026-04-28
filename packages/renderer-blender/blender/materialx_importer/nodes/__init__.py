@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from . import color, geometry, logic, math, mix, noise, ramps, structure, texture
+from . import color, geometry, logic, math, matrix, mix, noise, ramps, structure, texture
 
 
 def register_all(registry) -> None:
@@ -8,6 +8,7 @@ def register_all(registry) -> None:
     structure.register(registry)
     texture.register(registry)
     math.register(registry)
+    matrix.register(registry)
     logic.register(registry)
     ramps.register(registry)
     color.register(registry)

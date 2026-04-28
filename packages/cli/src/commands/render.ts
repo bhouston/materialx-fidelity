@@ -4,7 +4,10 @@ import { createElement, useEffect, useMemo, useRef, useState } from 'react';
 import { Box, Text, render, useApp, useInput } from 'ink';
 import { createReferences } from '@material-fidelity/core';
 import type { CreateReferencesProgressEvent, CreateReferencesResult, FidelityRenderer } from '@material-fidelity/core';
-import { createRenderer as createBlenderRenderer } from '@material-fidelity/renderer-blender';
+import {
+  createIoBlenderMtlxRenderer,
+  createRenderer as createBlenderRenderer,
+} from '@material-fidelity/renderer-blender';
 import { createRenderer as createMaterialXJsRenderer } from '@material-fidelity/renderer-materialxjs';
 import { createRenderer as createMaterialXViewRenderer } from '@material-fidelity/renderer-materialxview';
 import {
@@ -307,6 +310,7 @@ export const command = defineCommand({
     const thirdPartyRoot = resolveThirdPartyRoot(invocationCwd);
     const renderers: FidelityRenderer[] = [
       createBlenderRenderer({ thirdPartyRoot }),
+      createIoBlenderMtlxRenderer({ thirdPartyRoot }),
       createMaterialXJsRenderer({ thirdPartyRoot }),
       createMaterialXViewRenderer(),
       createThreeJsNewRenderer({ thirdPartyRoot }),

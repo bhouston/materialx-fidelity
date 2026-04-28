@@ -20,10 +20,21 @@ class CompiledSocket:
 
 
 @dataclass
+class CompiledMatrix:
+    size: int
+    rows: list[list[bpy.types.NodeSocket]]
+    type_name: str
+    values: list[list[float]] | None = None
+
+
+CompiledValue = CompiledSocket | CompiledMatrix
+
+
+@dataclass
 class CompileContext:
     document: Any
     material: bpy.types.Material
     base_dir: Path
     warnings: list[str]
-    cache: dict[tuple[int, str], CompiledSocket] = field(default_factory=dict)
+    cache: dict[tuple[str, str, str], CompiledValue] = field(default_factory=dict)
     compiler: Any | None = None

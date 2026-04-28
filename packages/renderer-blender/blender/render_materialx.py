@@ -1,22 +1,81 @@
 from __future__ import annotations
 
+import time
+
+_SCRIPT_STARTED_AT = time.perf_counter()
+_IMPORT_TIMINGS_MS: dict[str, float] = {}
+
+_started_at = time.perf_counter()
 import argparse
+_IMPORT_TIMINGS_MS["argparse"] = round((time.perf_counter() - _started_at) * 1000.0, 3)
+
+_started_at = time.perf_counter()
 import json
+_IMPORT_TIMINGS_MS["json"] = round((time.perf_counter() - _started_at) * 1000.0, 3)
+
+_started_at = time.perf_counter()
 import math
+_IMPORT_TIMINGS_MS["math"] = round((time.perf_counter() - _started_at) * 1000.0, 3)
+
+_started_at = time.perf_counter()
 import sys
+_IMPORT_TIMINGS_MS["sys"] = round((time.perf_counter() - _started_at) * 1000.0, 3)
+
+_started_at = time.perf_counter()
+from collections.abc import Callable
+_IMPORT_TIMINGS_MS["collections_abc"] = round((time.perf_counter() - _started_at) * 1000.0, 3)
+
+_started_at = time.perf_counter()
 from pathlib import Path
+_IMPORT_TIMINGS_MS["pathlib"] = round((time.perf_counter() - _started_at) * 1000.0, 3)
 
+_started_at = time.perf_counter()
+from typing import Any, Literal, TypeVar
+_IMPORT_TIMINGS_MS["typing"] = round((time.perf_counter() - _started_at) * 1000.0, 3)
+
+_started_at = time.perf_counter()
 import bpy
-from mathutils import Matrix, Vector
+_IMPORT_TIMINGS_MS["bpy"] = round((time.perf_counter() - _started_at) * 1000.0, 3)
 
+_started_at = time.perf_counter()
+from mathutils import Matrix, Vector
+_IMPORT_TIMINGS_MS["mathutils"] = round((time.perf_counter() - _started_at) * 1000.0, 3)
+
+_started_at = time.perf_counter()
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
+_IMPORT_TIMINGS_MS["script_path_setup"] = round((time.perf_counter() - _started_at) * 1000.0, 3)
 
+_started_at = time.perf_counter()
 from materialx_importer import load_materialx_as_blender_material
+_IMPORT_TIMINGS_MS["materialx_importer"] = round((time.perf_counter() - _started_at) * 1000.0, 3)
+_IMPORT_TIMINGS_MS["total_before_main"] = round((time.perf_counter() - _SCRIPT_STARTED_AT) * 1000.0, 3)
 
 IDEAL_MESH_SPHERE_RADIUS = 2.0
 ENVIRONMENT_ROTATION_DEGREES = 90.0
+CYCLES_RENDER_PROFILE: Literal["default", "fast"] = "fast"
+CYCLES_RENDER_PROFILES = {
+    "default": {
+        "samples": 32,
+        "adaptive_threshold": 0.02,
+        "max_bounces": 4,
+        "diffuse_bounces": 2,
+        "glossy_bounces": 2,
+        "transmission_bounces": 4,
+        "transparent_max_bounces": 4,
+    },
+    "fast": {
+        "samples": 8,
+        "adaptive_threshold": 0.05,
+        "max_bounces": 2,
+        "diffuse_bounces": 1,
+        "glossy_bounces": 1,
+        "transmission_bounces": 2,
+        "transparent_max_bounces": 2,
+    },
+}
+_T = TypeVar("_T")
 
 
 def main() -> int:
@@ -32,26 +91,136 @@ def main() -> int:
 
 
 def create_template(args: argparse.Namespace, warnings: list[str]) -> None:
-    clear_scene()
-    configure_render(args.width, args.height, None, args.background_color)
-    imported_objects = import_model(args.model_path)
-    recenter_and_normalize(imported_objects)
-    setup_camera()
-    setup_environment(args.environment_hdr_path, args.background_color, warnings)
-    print(json.dumps({"event": "blender-template-create", "warnings": warnings}))
-    bpy.ops.wm.save_as_mainfile(filepath=args.template_output_path)
-    print(json.dumps({"event": "blender-template-finish", "output": args.template_output_path, "warnings": warnings}))
+    timings: dict[str, float] = {}
+    started_at = time.perf_counter()
+    time_call(timings, "clear_scene", clear_scene)
+    time_call(
+        timings,
+        "configure_render",
+        configure_render,
+        args.width,
+        args.height,
+        None,
+        args.background_color,
+    )
+    imported_objects = time_call(timings, "import_model", import_model, args.model_path)
+    time_call(timings, "recenter_and_normalize", recenter_and_normalize, imported_objects)
+    time_call(timings, "setup_camera", setup_camera)
+    time_call(
+        timings,
+        "setup_environment",
+        setup_environment,
+        args.environment_hdr_path,
+        args.background_color,
+        warnings,
+    )
+    log_warnings_event("blender-template-create", warnings)
+    time_call(
+        timings,
+        "save_mainfile",
+        bpy.ops.wm.save_as_mainfile,
+        filepath=args.template_output_path,
+    )
+    timings["total"] = elapsed_ms(started_at)
+    # log_timing_event(
+    #     "blender-template-timing",
+    #     timings,
+    #     output=args.template_output_path,
+    #     warnings=warnings,
+    # )
+    print(
+        json.dumps(
+            {
+                "event": "blender-template-finish",
+                "output": args.template_output_path,
+                "warnings": warnings,
+            }
+        )
+    )
 
 
 def render_from_template(args: argparse.Namespace, warnings: list[str]) -> None:
-    configure_render(args.width, args.height, args.output_png_path, args.background_color)
-    normalized_root = find_normalized_root()
-    material_result = load_materialx_as_blender_material(args.mtlx_path)
+    timings: dict[str, float] = {}
+    started_at = time.perf_counter()
+    time_call(
+        timings,
+        "configure_render",
+        configure_render,
+        args.width,
+        args.height,
+        args.output_png_path,
+        args.background_color,
+    )
+    normalized_root = time_call(timings, "find_normalized_root", find_normalized_root)
+    material_result = time_call(
+        timings,
+        "load_materialx",
+        load_materialx_as_blender_material,
+        args.mtlx_path,
+    )
     warnings.extend(material_result.warnings)
-    apply_material(normalized_root, material_result.material)
-    print(json.dumps({"event": "blender-render-start", "warnings": warnings}))
-    bpy.ops.render.render(write_still=True)
-    print(json.dumps({"event": "blender-render-finish", "output": args.output_png_path, "warnings": warnings}))
+    time_call(
+        timings,
+        "apply_material",
+        apply_material,
+        normalized_root,
+        material_result.material,
+    )
+    log_warnings_event("blender-render-start", warnings)
+    time_call(timings, "cycles_render", bpy.ops.render.render, write_still=True)
+    timings["total"] = elapsed_ms(started_at)
+    # log_timing_event(
+    #     "blender-render-timing",
+    #     timings,
+    #     output=args.output_png_path,
+    #     mtlx_path=args.mtlx_path,
+    #     warnings=warnings,
+    # )
+    print(
+        json.dumps(
+            {
+                "event": "blender-render-finish",
+                "output": args.output_png_path,
+                "warnings": warnings,
+            }
+        )
+    )
+
+
+def elapsed_ms(started_at: float) -> float:
+    return round((time.perf_counter() - started_at) * 1000.0, 3)
+
+
+def time_call(
+    timings: dict[str, float],
+    name: str,
+    fn: Callable[..., _T],
+    *args: Any,
+    **kwargs: Any,
+) -> _T:
+    started_at = time.perf_counter()
+    try:
+        return fn(*args, **kwargs)
+    finally:
+        timings[name] = elapsed_ms(started_at)
+
+
+def log_timing_event(event: str, timings: dict[str, float], **fields: Any) -> None:
+    print(
+        json.dumps(
+            {
+                "event": event,
+                "initialization_ms": _IMPORT_TIMINGS_MS,
+                "timings_ms": timings,
+                **fields,
+            }
+        )
+    )
+
+
+def log_warnings_event(event: str, warnings: list[str]) -> None:
+    if warnings:
+        print(json.dumps({"event": event, "warnings": warnings}))
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -96,15 +265,16 @@ def clear_scene() -> None:
 def configure_render(width: int, height: int, output_png_path: str | None, background_color: str) -> None:
     scene = bpy.context.scene
     scene.render.engine = "CYCLES"
-    scene.cycles.samples = 32
+    cycles_profile = CYCLES_RENDER_PROFILES[CYCLES_RENDER_PROFILE]
+    scene.cycles.samples = cycles_profile["samples"]
     scene.cycles.use_adaptive_sampling = True
-    scene.cycles.adaptive_threshold = 0.02
+    scene.cycles.adaptive_threshold = cycles_profile["adaptive_threshold"]
     scene.cycles.use_denoising = True
-    scene.cycles.max_bounces = 4
-    scene.cycles.diffuse_bounces = 2
-    scene.cycles.glossy_bounces = 2
-    scene.cycles.transmission_bounces = 4
-    scene.cycles.transparent_max_bounces = 4
+    scene.cycles.max_bounces = cycles_profile["max_bounces"]
+    scene.cycles.diffuse_bounces = cycles_profile["diffuse_bounces"]
+    scene.cycles.glossy_bounces = cycles_profile["glossy_bounces"]
+    scene.cycles.transmission_bounces = cycles_profile["transmission_bounces"]
+    scene.cycles.transparent_max_bounces = cycles_profile["transparent_max_bounces"]
     scene.cycles.caustics_reflective = False
     scene.cycles.caustics_refractive = False
     scene.render.resolution_x = width

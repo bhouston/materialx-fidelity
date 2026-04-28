@@ -7,3 +7,6 @@
 [submodule "third_party/blender_materialx_addon"]
 	path = third_party/blender_materialx_addon
 	url = git@github.com:bhouston/blender_materialx_addon.git
+[submodule "third_party/io_blender_mtlx"]
+	path = third_party/io_blender_mtlx
+	url = https://github.com/Activision/io_blender_mtlx.git

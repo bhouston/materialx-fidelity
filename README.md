@@ -14,7 +14,7 @@ Material Fidelity is a TypeScript monorepo for generating and comparing renderer
 - Node.js 24+
 - pnpm 10+
 - `materialxview` (or `MaterialXView`) available on your `PATH`
-- Blender 4.0+ available as `blender` on your `PATH` or via `BLENDER_EXECUTABLE`
+- Blender 4.0+ available as `blender` on your `PATH` or via `BLENDER_EXECUTABLE` (`blender-io-mtlx` requires Blender 5.0+)
 
 ## Install
 
@@ -58,6 +58,7 @@ Currently supported renderers:
 - `materialxjs` (`@material-fidelity/renderer-materialxjs`)
 - `materialxview` (`@material-fidelity/renderer-materialxview`)
 - `blender` (`@material-fidelity/renderer-blender`, Blender bundled MaterialX rendered through Cycles)
+- `blender-io-mtlx` (`@material-fidelity/renderer-blender`, vendored `io_blender_mtlx` add-on rendered through Cycles)
 - `threejs-new` (`@material-fidelity/renderer-threejs`, custom MaterialX support proposal)
 - `threejs-current` (`@material-fidelity/renderer-threejs`, official npm Three.js MaterialX support)
 
@@ -149,7 +150,7 @@ To keep reference renders visually comparable between `materialxview`, `threejs-
 - fixed resolution of `512x512`
 
 These values are intentionally aligned with `MaterialXView` defaults and its scene normalization behavior in `source/MaterialXView/Viewer.cpp`.
-The Blender renderer follows the same scene contract through a background Python script that uses Blender's bundled `MaterialX` module and built-in `bpy` rendering APIs.
+The Blender renderers follow the same scene contract through background Python scripts. `blender` uses the in-repo importer built on Blender's bundled `MaterialX` module, while `blender-io-mtlx` loads the vendored `third_party/io_blender_mtlx` add-on programmatically without requiring a manual Blender add-on install.
 
 ## Viewer
 
@@ -159,7 +160,7 @@ Run the MaterialX Fidelity Viewer:
 pnpm viewer
 ```
 
-The viewer scans MaterialX materials and looks for images for the built-in renderer list (`materialxjs`, `materialxview`, `blender`, `threejs-current`, `threejs-new`).
+The viewer scans MaterialX materials and looks for images for the built-in renderer list (`materialxjs`, `materialxview`, `blender`, `blender-io-mtlx`, `threejs-current`, `threejs-new`).
 
 The page groups materials by purpose/type (`showcase`, `nodes`, `open_pbr_surface`, `gltf_pbr`, `standard_surface`) and displays each renderer image (`<renderer>.png`) side by side. Missing images render as a placeholder tile.
 

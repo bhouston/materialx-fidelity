@@ -3,7 +3,7 @@ import { access, mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createRenderer } from './index.js';
+import { createIoBlenderMtlxRenderer, createRenderer } from './index.js';
 
 type UnknownFn = (...args: unknown[]) => unknown;
 
@@ -30,11 +30,11 @@ async function createFile(filePath: string): Promise<void> {
   await writeFile(filePath, 'x', 'utf8');
 }
 
-function mockSuccessfulPrerequisites(): void {
+function mockSuccessfulPrerequisites(version = '4.2.0'): void {
   spawnSyncMock.mockImplementation((...args: unknown[]) => {
     const commandArgs = Array.isArray(args[1]) ? args[1] : [];
     if (commandArgs.includes('--version')) {
-      return { status: 0, stdout: 'Blender 4.2.0\n', stderr: '' };
+      return { status: 0, stdout: `Blender ${version}\n`, stderr: '' };
     }
     if (commandArgs.includes('--python-expr')) {
       return { status: 0, stdout: 'MATERIALX_VERSION=1.39.0\n', stderr: '' };
@@ -64,16 +64,45 @@ function mockSpawnExit(code: number, stdout = '', stderr = ''): void {
   });
 }
 
+function mockSpawnExitAndCreateTemplate(code: number, stdout = '', stderr = ''): void {
+  spawnMock.mockImplementation((...args: unknown[]) => {
+    const commandArgs = Array.isArray(args[1]) ? args[1] : [];
+    const process = new EventEmitter() as EventEmitter & {
+      stdout: EventEmitter;
+      stderr: EventEmitter;
+    };
+    process.stdout = new EventEmitter();
+    process.stderr = new EventEmitter();
+    queueMicrotask(async () => {
+      if (commandArgs.includes('--template-output-path')) {
+        await createFile(getArgValue(commandArgs, '--template-output-path'));
+      }
+      if (stdout) {
+        process.stdout.emit('data', Buffer.from(stdout));
+      }
+      if (stderr) {
+        process.stderr.emit('data', Buffer.from(stderr));
+      }
+      process.emit('close', code);
+    });
+    return process;
+  });
+}
+
 function mockSpawnExitSequence(results: Array<{ code: number; stdout?: string; stderr?: string }>): void {
   for (const result of results) {
-    spawnMock.mockImplementationOnce(() => {
+    spawnMock.mockImplementationOnce((...args: unknown[]) => {
+      const commandArgs = Array.isArray(args[1]) ? args[1] : [];
       const process = new EventEmitter() as EventEmitter & {
         stdout: EventEmitter;
         stderr: EventEmitter;
       };
       process.stdout = new EventEmitter();
       process.stderr = new EventEmitter();
-      queueMicrotask(() => {
+      queueMicrotask(async () => {
+        if (commandArgs.includes('--template-output-path')) {
+          await createFile(getArgValue(commandArgs, '--template-output-path'));
+        }
         if (result.stdout) {
           process.stdout.emit('data', Buffer.from(result.stdout));
         }
@@ -106,6 +135,11 @@ afterEach(async () => {
 });
 
 describe('blender renderer', () => {
+  it('exposes the default and io_blender_mtlx renderer names', () => {
+    expect(createRenderer({ thirdPartyRoot: '/tmp/third_party' }).name).toBe('blender');
+    expect(createIoBlenderMtlxRenderer({ thirdPartyRoot: '/tmp/third_party' }).name).toBe('blender-io-mtlx');
+  });
+
   it('reports missing Blender prerequisites', async () => {
     spawnSyncMock.mockReturnValue({ error: new Error('not found'), status: null, stdout: '', stderr: '' });
 
@@ -129,17 +163,43 @@ describe('blender renderer', () => {
     expect(result.message).toContain('bundled MaterialX module is unavailable');
   });
 
+  it('requires Blender 5.0+ for the io_blender_mtlx renderer', async () => {
+    mockSuccessfulPrerequisites('4.2.0');
+    const thirdPartyRoot = await makeTempDir('blender-third-party-');
+    await createFile(path.join(thirdPartyRoot, 'io_blender_mtlx', 'bl_env', 'addons', 'io_data_mtlx', '__init__.py'));
+
+    const renderer = createIoBlenderMtlxRenderer({ thirdPartyRoot });
+    const result = await renderer.checkPrerequisites();
+
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('Blender 5.0.0+ is required');
+  });
+
+  it('reports missing io_blender_mtlx add-on files', async () => {
+    mockSuccessfulPrerequisites('5.0.0');
+    const thirdPartyRoot = await makeTempDir('blender-third-party-');
+
+    const renderer = createIoBlenderMtlxRenderer({ thirdPartyRoot });
+    const result = await renderer.checkPrerequisites();
+
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('io_blender_mtlx');
+  });
+
   it('passes render options to Blender and captures logs', async () => {
     mockSuccessfulPrerequisites();
-    mockSpawnExit(
-      0,
-      [
-        '00:00.302  blend            | Read blend: "/tmp/material-fidelity-blender-abc/template.blend"',
-        "00:04.658  render           | Saved: '/tmp/example/blender-temp.png'",
-        'render started',
-        'render finished',
-      ].join('\n'),
-    );
+    mockSpawnExitSequence([
+      { code: 0, stdout: 'template created\n' },
+      {
+        code: 0,
+        stdout: [
+          '00:00.302  blend            | Read blend: "/tmp/material-fidelity-blender-abc/template.blend"',
+          "00:04.658  render           | Saved: '/tmp/example/blender-temp.png'",
+          'render started',
+          'render finished',
+        ].join('\n'),
+      },
+    ]);
     const thirdPartyRoot = await makeTempDir('blender-third-party-');
     const viewerRoot = path.join(thirdPartyRoot, 'material-samples', 'viewer');
     const materialsRoot = path.join(thirdPartyRoot, 'material-samples', 'materials', 'example');
@@ -198,9 +258,44 @@ describe('blender renderer', () => {
     expect(result.logs.map((entry: { message: string }) => entry.message)).toEqual(['render started', 'render finished']);
   });
 
+  it('uses the io_blender_mtlx render script for the add-on renderer', async () => {
+    mockSuccessfulPrerequisites('5.0.0');
+    mockSpawnExitSequence([
+      { code: 0, stdout: 'template created\n' },
+      { code: 0, stdout: 'render finished\n' },
+    ]);
+    const thirdPartyRoot = await makeTempDir('blender-third-party-');
+    const viewerRoot = path.join(thirdPartyRoot, 'material-samples', 'viewer');
+    const materialsRoot = path.join(thirdPartyRoot, 'material-samples', 'materials', 'example');
+    const materialPath = path.join(materialsRoot, 'example.mtlx');
+    const outputPath = path.join(materialsRoot, 'blender-io-mtlx.png');
+    const modelPath = path.join(viewerRoot, 'ShaderBall.glb');
+    const environmentHdrPath = path.join(viewerRoot, 'san_giuseppe_bridge_2k.hdr');
+    await Promise.all([
+      createFile(materialPath),
+      createFile(modelPath),
+      createFile(environmentHdrPath),
+      createFile(path.join(thirdPartyRoot, 'io_blender_mtlx', 'bl_env', 'addons', 'io_data_mtlx', '__init__.py')),
+    ]);
+
+    const renderer = createIoBlenderMtlxRenderer({ thirdPartyRoot });
+    await renderer.start({ modelPath, environmentHdrPath, backgroundColor: '0,0,0' });
+    await renderer.generateImage({
+      mtlxPath: materialPath,
+      outputPngPath: outputPath,
+    });
+
+    expect(spawnMock).toHaveBeenCalledTimes(2);
+    const [, templateArgs] = spawnMock.mock.calls[0] as [string, string[]];
+    const [, renderArgs] = spawnMock.mock.calls[1] as [string, string[]];
+    expect(getArgValue(templateArgs, '--python')).toMatch(/render_materialx_io_blender_mtlx\.py$/);
+    expect(getArgValue(renderArgs, '--python')).toMatch(/render_materialx_io_blender_mtlx\.py$/);
+    expect(renderArgs).toEqual(expect.arrayContaining(['--third-party-root', thirdPartyRoot]));
+  });
+
   it('requires PNG output paths', async () => {
     mockSuccessfulPrerequisites();
-    mockSpawnExit(0, 'template created\n');
+    mockSpawnExitAndCreateTemplate(0, 'template created\n');
     const renderer = createRenderer({ thirdPartyRoot: '/tmp/third_party' });
     await renderer.start({
       modelPath: '/tmp/model.glb',
@@ -245,7 +340,7 @@ describe('blender renderer', () => {
 
   it('removes the temporary template directory during shutdown', async () => {
     mockSuccessfulPrerequisites();
-    mockSpawnExit(0, 'template created\n');
+    mockSpawnExitAndCreateTemplate(0, 'template created\n');
     const renderer = createRenderer({ thirdPartyRoot: '/tmp/third_party' });
     await renderer.start({
       modelPath: '/tmp/model.glb',
@@ -260,6 +355,23 @@ describe('blender renderer', () => {
 
     await renderer.shutdown();
 
-    await expect(access(templateDirectory)).rejects.toThrow();
+    await expect(access(templateDirectory)).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('reports template creation when Blender exits without writing the template file', async () => {
+    mockSuccessfulPrerequisites();
+    mockSpawnExit(0, 'template skipped\n');
+    const renderer = createRenderer({ thirdPartyRoot: '/tmp/third_party' });
+
+    await expect(
+      renderer.start({
+        modelPath: '/tmp/model.glb',
+        environmentHdrPath: '/tmp/environment.hdr',
+        backgroundColor: '0,0,0',
+      }),
+    ).rejects.toMatchObject({
+      message: expect.stringContaining('Blender template was not created'),
+      rendererLogs: [{ level: 'info', source: 'renderer', message: 'template skipped' }],
+    });
   });
 });

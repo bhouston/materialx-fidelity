@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 from typing import Any
 
 from .document import get_input, input_value
 
 
 COMPONENT_TYPES = {"color3", "color4", "vector2", "vector3", "vector4"}
+MATRIX_TYPES = {"matrix33": 3, "matrix44": 4}
 
 
 def parse_float(value: Any) -> float:
@@ -58,6 +60,34 @@ def parse_vector(value: Any) -> list[float]:
     if len(pieces) == 2:
         return [pieces[0], pieces[1], 0.0]
     return pieces[:3]
+
+
+def parse_float_sequence(value: Any) -> list[float]:
+    if isinstance(value, (float, int, bool)):
+        return [parse_bool_float(value)]
+    if isinstance(value, (list, tuple)):
+        return [float(piece) for piece in value]
+    pieces = []
+    for piece in re.split(r"[,\s]+", str(value).strip()):
+        if piece:
+            pieces.append(float(piece))
+    return pieces
+
+
+def identity_matrix_values(size: int) -> list[list[float]]:
+    return [[1.0 if row == column else 0.0 for column in range(size)] for row in range(size)]
+
+
+def parse_matrix(value: Any, size: int) -> list[list[float]]:
+    pieces = parse_float_sequence(value)
+    expected = size * size
+    if len(pieces) != expected:
+        return identity_matrix_values(size)
+    return [[pieces[column * size + row] for column in range(size)] for row in range(size)]
+
+
+def matrix_size(type_name: str | None) -> int | None:
+    return MATRIX_TYPES.get(type_name or "")
 
 
 def component_count(type_name: str) -> int:
