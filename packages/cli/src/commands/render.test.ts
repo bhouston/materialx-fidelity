@@ -1,10 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { command } from './create-references.js';
+import { command } from './render.js';
 import type { createReferences } from '@material-fidelity/core';
 
-const { createReferencesMock } = vi.hoisted(() => ({
+const { availableParallelismMock, createReferencesMock } = vi.hoisted(() => ({
+  availableParallelismMock: vi.fn(() => 8),
   createReferencesMock: vi.fn<typeof createReferences>(),
 }));
+
+vi.mock('node:os', async (importActual) => {
+  const actual = await importActual<typeof import('node:os')>();
+  return {
+    ...actual,
+    availableParallelism: availableParallelismMock,
+  };
+});
 
 vi.mock('@material-fidelity/core', () => ({
   createReferences: createReferencesMock,
@@ -51,8 +60,10 @@ vi.mock('@material-fidelity/renderer-threejs', () => ({
   }),
 }));
 
-describe('create-references command', () => {
+describe('render command', () => {
   beforeEach(() => {
+    availableParallelismMock.mockReset();
+    availableParallelismMock.mockReturnValue(8);
     createReferencesMock.mockReset();
     createReferencesMock.mockResolvedValue({
       rendererNames: ['materialxview'],
@@ -62,6 +73,10 @@ describe('create-references command', () => {
       failures: [],
       stopped: false,
     });
+  });
+
+  it('is invoked as render', () => {
+    expect(command.command).toBe('render');
   });
 
   it('invokes core createReferences with parsed options', async () => {
@@ -96,6 +111,48 @@ describe('create-references command', () => {
     });
     expect(firstCall?.[0].thirdPartyRoot.endsWith('/third_party')).toBe(true);
     expect(firstCall?.[0].renderers).toHaveLength(4);
+  });
+
+  it('defaults concurrency to the recommended available parallelism', async () => {
+    availableParallelismMock.mockReturnValue(8);
+
+    const argv = {
+      renderers: undefined,
+      materials: undefined,
+      filter: undefined,
+      concurrency: undefined,
+      _: [],
+      $0: 'cli',
+    } as unknown as Parameters<typeof command.handler>[0];
+
+    await command.handler(argv);
+
+    const [firstCall] = createReferencesMock.mock.calls;
+    expect(firstCall).toBeDefined();
+    expect(firstCall?.[0]).toMatchObject({
+      concurrency: 8,
+    });
+  });
+
+  it('keeps the default concurrency at least 1', async () => {
+    availableParallelismMock.mockReturnValue(1);
+
+    const argv = {
+      renderers: undefined,
+      materials: undefined,
+      filter: undefined,
+      concurrency: undefined,
+      _: [],
+      $0: 'cli',
+    } as unknown as Parameters<typeof command.handler>[0];
+
+    await command.handler(argv);
+
+    const [firstCall] = createReferencesMock.mock.calls;
+    expect(firstCall).toBeDefined();
+    expect(firstCall?.[0]).toMatchObject({
+      concurrency: 1,
+    });
   });
 
   it('passes materials selectors through to core createReferences', async () => {

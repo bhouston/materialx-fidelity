@@ -85,6 +85,13 @@ describe('materialx translator contracts', () => {
     expect(typeof cellnoise3d.defaults.position).toBe('function');
   });
 
+  it('maps fractal2d input to texcoord semantics', () => {
+    const fractal2d = MtlXLibrary.fractal2d;
+    expect(fractal2d).toBeDefined();
+    expect(fractal2d.params).toEqual(['texcoord', 'octaves', 'lacunarity', 'diminish', 'amplitude']);
+    expect(fractal2d.defaults.texcoord).toBeDefined();
+  });
+
   it('builds a typed surface registry', () => {
     expect(surfaceMapperRegistry.size).toBeGreaterThan(0);
     expect(getSupportedSurfaceCategories()).toEqual(expect.arrayContaining(['standard_surface', 'gltf_pbr', 'open_pbr_surface']));

@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { availableParallelism } from 'node:os';
 import { createElement, useEffect, useMemo, useRef, useState } from 'react';
 import { Box, Text, render, useApp, useInput } from 'ink';
 import { createReferences } from '@material-fidelity/core';
@@ -27,6 +28,10 @@ function resolveThirdPartyRoot(invocationCwd: string): string {
 
 function formatElapsed(seconds: number): string {
   return humanizeTime(Math.max(0, seconds), { unitSeparator: ' ' });
+}
+
+function getDefaultConcurrency(): number {
+  return Math.max(1, availableParallelism());
 }
 
 function formatMaterialLabel(materialPath: string, materialsRoot: string): string {
@@ -267,8 +272,8 @@ async function runCreateReferencesWithInk(args: InkCreateReferencesAppProps['arg
 }
 
 export const command = defineCommand({
-  command: 'create-references',
-  describe: 'Generate reference PNG images for each MaterialX sample material.',
+  command: 'render',
+  describe: 'Render reference PNG images for each MaterialX sample material.',
   builder: (yargs) =>
     yargs
       .option('renderers', {
@@ -277,8 +282,8 @@ export const command = defineCommand({
       })
       .option('concurrency', {
         type: 'number',
-        default: 1,
-        describe: 'Number of materials to render in parallel.',
+        default: getDefaultConcurrency(),
+        describe: 'Number of materials to render in parallel. Defaults to the recommended available parallelism.',
       })
       .option('materials', {
         type: 'array',
@@ -307,7 +312,7 @@ export const command = defineCommand({
       renderers,
       thirdPartyRoot,
       rendererNames: normalizeRendererNames(argv.renderers),
-      concurrency: Math.max(1, argv.concurrency),
+      concurrency: Math.max(1, argv.concurrency ?? getDefaultConcurrency()),
       materialSelectors: [...new Set(materialSelectors)],
       filter: argv.filter,
     };

@@ -8,7 +8,7 @@ The current upstream implementation is intentionally small: most of the loader, 
 
 The proposed implementation is more like a translator subsystem than a single loader. It splits parsing, document state, archive handling, compile dispatch, node-library dispatch, surface mapping, warnings, and category validation into separate modules. This adds complexity and bookkeeping, but most of it is explainable by the parity goal: better surface coverage, stricter CI feedback, better defaults, better reference resolution, correct MaterialX-oriented UV/matrix semantics, and targeted replacements for TSL helpers that do not match MaterialX.
 
-My recommendation is to preserve the new architecture's parity-critical parts, but avoid upstreaming all of its runtime bookkeeping as-is. In particular, the duplicate/fixed `mx_*` behavior should move into Three.js TSL or replace the faulty TSL implementations so the loader does not carry private forks of core MaterialX semantics.
+The practical porting direction is to bring the new implementation across as the replacement loader, then remove duplicate MaterialX helper behavior by moving those fixes into shared Three.js TSL `mx_*` helpers. The loader should keep the new parser/document/compile/surface/warning/archive architecture, while `three/tsl` should own the corrected MaterialX node semantics.
 
 ## Files Compared
 
@@ -65,7 +65,7 @@ The proposed implementation separates responsibilities:
 - `MaterialXWarnings.js` provides structured warnings/errors and strict policies.
 - `MaterialXNodeRegistry.js` validates compile/surface registry category names against generated MaterialX category metadata.
 
-This is a clear complexity increase. The new code is more modular, but it also adds a compile context, registry validation, issue collector, archive disposal, surface registries, generated category metadata, and many default-value factories. Those are not free, and only some of them are directly required for MaterialX parity.
+This is a clear complexity increase. The new code is more modular, and it adds a compile context, registry validation, issue collector, archive disposal, surface registries, generated category metadata, and many default-value factories. For a full replacement, these pieces should be brought across together because they support the new translator's broader node coverage, diagnostics, and resource handling.
 
 ## Node Coverage and Translation
 
@@ -181,7 +181,7 @@ The new loader:
 - Uses `ImageLoader` for SVGs.
 - Handles missing texture files with fallbacks and issues.
 
-The UV conversion is important parity work. It should not remain a private behavior inside a vendored loader if MaterialX support is upstreamed.
+The UV conversion is important parity work and should move across with the new implementation.
 
 ### Color Space
 
@@ -195,7 +195,22 @@ The old loader reads raw `.mtlx` text only.
 
 The new loader reads `ArrayBuffer`, detects ZIP input, requires exactly one `.mtlx` file, and resolves texture URIs from the archive to Blob URLs. It also exposes `dispose()`/`clearArchiveResources()` to revoke Blob URLs.
 
-This is useful for browser workflows and self-contained MaterialX packages, but it is not strictly necessary for core MaterialX parity. If upstream Three.js wants minimal loader scope, archive support could be a separate enhancement.
+This should move across with the new implementation. It expands the loader from raw `.mtlx` text files to both direct `.mtlx` input and self-contained `.mtlx.zip` packages.
+
+### Direct `.mtlx` Resource Path Compatibility
+
+The new loader still supports direct `.mtlx` files. It loads with `FileLoader`, sets `responseType` to `arraybuffer`, decodes non-ZIP data as text, then parses it through the new document pipeline.
+
+For texture/resource resolution, the new loader currently matches the old loader's main behavior: texture loaders are configured with `this.path`, and filename inputs are resolved as `fileprefix + value`. That means it is drop-in compatible for existing usage like:
+
+```js
+const loader = new MaterialXLoader().setPath( '/materials/foo/' );
+loader.load( 'material.mtlx', onLoad );
+```
+
+In that case, relative texture paths resolve under `/materials/foo/`, as they do with the current Three.js loader.
+
+One compatibility detail to verify during the port: if callers use `loader.load( '/materials/foo/material.mtlx' )` without calling `setPath( '/materials/foo/' )`, neither implementation currently derives a resource base path from the loaded `.mtlx` URL in the code reviewed here. If the replacement should be robustly relative to the input URL itself, pass a derived resource path from `MaterialXLoader.load()` / `parseBuffer(data, url)` into `MaterialXDocument`, and set `ImageLoader` / `ImageBitmapLoader` paths from that derived directory.
 
 ## Duplicated or Reimplemented TSL Functionality
 
@@ -211,7 +226,7 @@ The new implementation includes several local replacements or wrappers because t
 - `mx_ifgreatereq_materialx(...)` swaps branches.
 - `mx_ifequal_materialx(...)` swaps branches.
 
-This is the clearest case where Three.js TSL should be corrected or given MaterialX-correct helpers. Carrying private wrappers in the loader is undesirable.
+This is the clearest case where Three.js TSL should be corrected or given MaterialX-correct helpers. After the fix lands in TSL, the loader's private wrappers can be removed.
 
 ### Smoothstep Degenerate Range Semantics
 
@@ -232,7 +247,7 @@ The new loader reimplements:
 - `mx_unifiednoise2d_materialx`.
 - `mx_unifiednoise3d_materialx`.
 
-This suggests the existing TSL MaterialX noise helpers were not close enough to MaterialXView/reference output. These are expensive helpers to keep private. If they are correct against MaterialXView, they should replace or augment the Three.js `mx_*` noise exports.
+This suggests the existing TSL MaterialX noise helpers were not close enough to MaterialXView/reference output. If these implementations are correct against MaterialXView, they should replace or augment the Three.js `mx_*` noise exports, and the loader should call the shared TSL versions.
 
 ### Place2d and Rotate Semantics
 
@@ -264,36 +279,32 @@ The new loader uses `mx_mod(in1, in2) = in1 - in2 * floor(in1 / in2)` instead of
 
 The new hextile code is not a duplicate of a built-in TSL MaterialX function. It is a non-standard extension path (`hextiledimage`, `hextilednormalmap`) with stochastic sampling, derivatives, blending, and texture gradients.
 
-This is useful functionality, but it should not be mixed up with fixing broken built-ins. It is a feature extension and should be justified separately if proposed upstream.
+This is useful functionality and should move across with the replacement loader. It is a feature extension rather than a duplicate of a broken built-in TSL helper, so it can remain in the loader/compile layer unless Three.js later adds shared hextile TSL nodes.
 
-## Added Complexity and Whether It Is Justified
+## Added Complexity and Why It Moves Across
 
-### Clearly Justified by MaterialX Parity
+### Translator Infrastructure
 
 - Broader surface mapping: `gltf_pbr` and `open_pbr_surface` are essential for modern MaterialX sample parity.
 - Default input values in `MXElement`: MaterialX graphs often omit defaulted inputs; using defaults reduces false unsupported/fallback output.
-- Structured missing-reference/unsupported/invalid-value reporting: this is critical for a fidelity project and useful for users.
+- Structured missing-reference/unsupported/invalid-value reporting: this makes parity gaps visible and gives CI/users a way to detect core translation failures.
 - Correct boolean/string/matrix handling: required for many real MaterialX graphs.
 - UV space conversion: required for visual parity.
-- Matrix layout and transformmatrix handling: required for correct transform node output.
-- MaterialX-correct conditionals, smoothstep, noise, place2d, and rotation semantics: required for node parity.
+- Matrix layout and `transformmatrix` handling: required for correct transform node output.
 - Surface ignored-input warnings: required to know whether a render is close because it is correct or merely because unsupported inputs were silent.
+- `.mtlx.zip` archive support and Blob URL lifecycle: needed for packaged browser workflows and should be preserved in the replacement.
+- `setMaterialName()`: useful when selecting one material from a multi-material document.
+- `warningCallback` and strict issue policies: useful for CI, test harnesses, and viewer diagnostics.
+- Generated category registry validation: useful to catch translator table typos and drift against MaterialX category names.
+- Hextile image nodes: useful non-standard coverage that is part of the proposed implementation.
 
-### Justified for This Project, But Optional for Upstream Core Loader
+### Duplicate TSL Semantics To Remove During Port
 
-- `.mtlx.zip` archive support and Blob URL lifecycle: useful in browser workflows, not strictly required to improve node parity.
-- `setMaterialName()`: useful when selecting one material from a document, but not central to MaterialX correctness.
-- `warningCallback` and strict issue policies: very useful for CI and this fidelity viewer; upstream may prefer a smaller API or a single structured report.
-- Generated category registry validation: useful to catch translator typos and drift, but it adds generated data and runtime validation that may feel heavy for Three.js examples code.
-- Hextile image nodes: useful, but non-standard. They should be framed as an extension.
-
-### Questionable or Worth Simplifying Before Upstreaming
-
-- Keeping private `_materialx` wrappers for broken TSL helpers. These should be fixed in the shared Three.js MaterialX TSL library.
-- Maintaining both generic `MtlXLibrary` entries and compile-registry overrides for `transformmatrix` and `invertmatrix`. The override is necessary now, but the generic entries become misleading.
-- Runtime category validation against a generated registry. This may be better as a build/test-time assertion rather than runtime loader behavior.
-- OpenPBR approximations need clear documentation. They improve visual parity, but they are not exact OpenPBR closure support.
-- Hextile support should be isolated or documented as non-standard.
+- Private `_materialx` wrappers for conditionals, smoothstep, noise, `place2d`, rotate, and modulo should become corrected shared Three.js TSL MaterialX helpers.
+- Once the shared TSL helpers are fixed, `MaterialXNodeLibrary.js` should import and use those shared functions directly.
+- `transformmatrix` and `invertmatrix` should keep their compile-registry handling because they depend on MaterialX nodedefs, matrix type/layout, constants, and fallback behavior. Any lower-level TSL matrix bugs found during the port should still be fixed in TSL.
+- OpenPBR approximations should move across with clear docs explaining that they map richer OpenPBR concepts onto `MeshPhysicalNodeMaterial`.
+- Hextile support should move across as a compile-registry extension.
 
 ## What Changed Functionally
 
@@ -318,34 +329,34 @@ Potential behavior changes to watch:
 - The loader now returns `{ materials, report }`, while the old loader returned `{ materials }`.
 - Strict issue policies can throw on documents that previously rendered with silent fallback nodes.
 
-## Upstreaming Recommendations
+## Porting Checklist
 
-1. Move semantic fixes into Three.js TSL first.
+1. Copy the new loader module structure into Three.js.
 
-   Start with conditional branch order, `smoothstep` degenerate behavior, `place2d` operation order, rotate semantics, modulo, and the reference-matching noise variants. The loader should consume shared `mx_*` functions instead of carrying private `*_materialx` wrappers.
+   Bring over `MaterialXLoader.js`, `MaterialXDocument.js`, `MaterialXArchive.js`, `MaterialXParser.js`, `MaterialXCompileRegistry.js`, `MaterialXNodeLibrary.js`, `MaterialXSurfaceRegistry.js`, `MaterialXSurfaceMappings.js`, `MaterialXWarnings.js`, `MaterialXNodeRegistry.js`, `MaterialXUtils.js`, `MaterialXTranslatorTypes.js`, and the generated category registry.
 
-2. Keep the compile registry concept.
+2. Move semantic fixes into Three.js TSL.
 
-   A registry is justified for nodes whose behavior is not a simple TSL function call: images, tiled images, glTF image nodes, matrix transforms, constants, geometry inputs, and channel outputs.
+   Start with conditional branch order, `smoothstep` degenerate behavior, `place2d` operation order, rotate semantics, modulo, and the reference-matching noise variants. Then update the loader's node library to consume shared `mx_*` functions instead of carrying private `*_materialx` wrappers.
 
-3. Keep structured issues, but consider API shape.
+3. Preserve the compile registry.
 
-   A parse `report` is valuable. Upstream Three.js may not want all strict policies and callbacks immediately, but silent fallback to `float(0)` is a major reason the current loader hides parity failures.
+   The registry is required for nodes whose behavior is not a simple TSL function call: images, tiled images, glTF image nodes, matrix transforms, constants, geometry inputs, hextile nodes, and channel outputs.
 
-4. Keep `gltf_pbr` and `open_pbr_surface`, with documented approximations.
+4. Preserve structured issues and parse reports.
 
-   These are core to the fidelity goal. Without them, Three.js MaterialX support remains poor relative to MaterialXView.
+   A parse `report`, warning callback, and strict issue policies are important for making translation gaps visible. They should replace the current pattern of scattered `console.warn` calls and silent `float(0)` fallback.
 
-5. Move generated category validation out of runtime if upstream size/simplicity matters.
+5. Bring over all three surface mappers.
 
-   It is useful for development, but it may be better as a test/build script in Three.js rather than code that runs when constructing the loader.
+   `standard_surface`, `gltf_pbr`, and `open_pbr_surface` are core to the fidelity goal. OpenPBR should be documented as a best-effort mapping onto `MeshPhysicalNodeMaterial`.
 
-6. Treat archive and hextile support as optional upstream additions.
+6. Keep direct `.mtlx` and `.mtlx.zip` loading.
 
-   They are useful, but they are not prerequisites for fixing core MaterialX parity.
+   Direct `.mtlx` files should continue to work through `FileLoader`; zipped packages should work through the new archive path. For stronger drop-in behavior, derive the resource base directory from the loaded `.mtlx` URL when `loader.path` is not set.
 
 ## Bottom Line
 
-The new implementation does add more complexity and bookkeeping than the old loader. A lot of that complexity is justified by the project goal: closing visible parity gaps with MaterialXView. The old implementation is small partly because it does not model enough of MaterialX's real behavior.
+The new implementation does add more complexity and bookkeeping than the old loader. That complexity should move across because it is the structure that enables the new parity work: broader surfaces, better node defaults, structured issue reporting, archive resources, UV/matrix correctness, and clearer compile dispatch. The old implementation is small partly because it does not model enough of MaterialX's real behavior.
 
-The most important cleanup before porting this back to Three.js is to avoid preserving duplicate MaterialX semantics inside the loader. Any private helper whose purpose is "Three.js TSL's MaterialX helper is wrong" should become a corrected Three.js TSL helper. Once those fixes live in `three/tsl`, the loader can stay focused on XML parsing, graph resolution, resource loading, and mapping MaterialX surfaces/nodes to shared TSL building blocks.
+The main cleanup during the port is to remove duplicated MaterialX semantics from the loader by fixing the shared Three.js TSL `mx_*` helpers. Any private helper whose purpose is "Three.js TSL's MaterialX helper is wrong" should become a corrected Three.js TSL helper. Once those fixes live in `three/tsl`, the replacement loader can keep the new architecture while using shared TSL building blocks for MaterialX behavior.

@@ -33,7 +33,7 @@ const register = (registry, categories, handler) => {
   }
 };
 
-const UV_FALLBACK_CATEGORIES = new Set(['noise2d', 'cellnoise2d', 'worleynoise2d', 'unifiednoise2d']);
+const UV_FALLBACK_CATEGORIES = new Set(['noise2d', 'fractal2d', 'cellnoise2d', 'worleynoise2d', 'unifiednoise2d']);
 
 const compileConvertNode = (nodeX) => {
   const nodeClass = nodeX.getClassFromType(nodeX.type) || float;

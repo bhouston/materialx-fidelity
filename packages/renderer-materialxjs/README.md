@@ -21,7 +21,7 @@ pnpm --filter @material-fidelity/renderer-materialxjs dev
 Then run normal reference generation:
 
 ```bash
-pnpm cli create-references --renderers materialxjs --materials open_pbr
+pnpm cli render --renderers materialxjs --materials open_pbr
 ```
 
 ## Upstream Source Mapping
@@ -44,5 +44,5 @@ When upstream MaterialX JavaScript changes, use this checklist:
    - `pnpm build`
    - `pnpm test`
 5. run a focused render diff:
-   - `pnpm cli create-references --renderers materialxjs --materials open_pbr`
+   - `pnpm cli render --renderers materialxjs --materials open_pbr`
 6. visually compare `materialxjs.png` against existing renderer outputs in the fidelity viewer

@@ -42,12 +42,12 @@ Generate reference images:
 
 ```bash
 # all renderers, all materials
-pnpm cli create-references
+pnpm cli render
 ```
 
 ```bash
 # only generate MaterialX JavaScript renders of open_pbr materials
-pnpm cli create-references --renderers materialxjs --materials open_pbr
+pnpm cli render --renderers materialxjs --materials open_pbr
 ```
 
 This command writes `<renderer-name>.png` in each directory containing a `.mtlx` material file.
@@ -63,7 +63,7 @@ Optional flags:
 
 - `--renderers <name[,name...]>` optional renderer filter; supports repeated flags and comma-separated values
 - `--materials <selector[,selector...]>` optional material filter; matches against each material directory name only (leaf directory), supports repeated flags, comma-separated values, substring matches, and regex selectors (`re:...` or `/.../flags`)
-- `--concurrency <number>` default `1`
+- `--concurrency <number>` optional render concurrency; defaults to the recommended available parallelism, with a minimum of `1`
 
 ## Material Organization
 
@@ -111,12 +111,12 @@ PY
 
 ```bash
 # all node-isolation materials
-pnpm cli create-references --materials node_isolation
+pnpm cli render --materials node_isolation
 ```
 
 ```bash
 # targeted node subset by regex on leaf directory names
-pnpm cli create-references --materials "re:(image|tiledimage|transformmatrix)$"
+pnpm cli render --materials "re:(image|tiledimage|transformmatrix)$"
 ```
 
 ## Surface Input Coverage

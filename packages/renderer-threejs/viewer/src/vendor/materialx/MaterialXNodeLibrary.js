@@ -386,6 +386,9 @@ const mx_worley_noise_float_materialx_2d = Fn(([texcoordInput, jitterInput, styl
   return sqdist;
 });
 
+const mx_fractal_noise_float_materialx_2d = (texcoord, octaves, lacunarity, diminish, amplitude) =>
+  mx_fractal_noise_float(vec3(element(texcoord, 0), element(texcoord, 1), 0), octaves, lacunarity, diminish, amplitude);
+
 const mx_unifiednoise2d_materialx = Fn(
   ([
     noiseTypeInput,
@@ -1027,6 +1030,18 @@ const MXElements = [
     amplitude: defaultFloat(1),
     pivot: defaultFloat(0),
   }),
+  new MXElement(
+    'fractal2d',
+    mx_fractal_noise_float_materialx_2d,
+    ['texcoord', 'octaves', 'lacunarity', 'diminish', 'amplitude'],
+    {
+      texcoord: defaultVec2(0, 0),
+      octaves: defaultInt(3),
+      lacunarity: defaultFloat(2.0),
+      diminish: defaultFloat(0.5),
+      amplitude: defaultFloat(1.0),
+    },
+  ),
   new MXElement('fractal3d', mx_fractal_noise_float, ['position', 'octaves', 'lacunarity', 'diminish', 'amplitude'], {
     position: () => positionLocal,
     octaves: defaultInt(3),
