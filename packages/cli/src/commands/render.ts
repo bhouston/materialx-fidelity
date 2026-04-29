@@ -6,6 +6,7 @@ import { createReferences } from '@material-fidelity/core';
 import type { CreateReferencesProgressEvent, CreateReferencesResult, FidelityRenderer } from '@material-fidelity/core';
 import {
   createIoBlenderMtlxRenderer,
+  createNodesRenderer as createBlenderNodesRenderer,
   createRenderer as createBlenderRenderer,
 } from '@material-fidelity/renderer-blender';
 import { createRenderer as createMaterialXJsRenderer } from '@material-fidelity/renderer-materialxjs';
@@ -310,6 +311,7 @@ export const command = defineCommand({
     const thirdPartyRoot = resolveThirdPartyRoot(invocationCwd);
     const renderers: FidelityRenderer[] = [
       createBlenderRenderer({ thirdPartyRoot }),
+      createBlenderNodesRenderer({ thirdPartyRoot }),
       createIoBlenderMtlxRenderer({ thirdPartyRoot }),
       createMaterialXJsRenderer({ thirdPartyRoot }),
       createMaterialXViewRenderer(),

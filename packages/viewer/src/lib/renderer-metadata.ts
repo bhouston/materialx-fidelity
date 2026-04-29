@@ -12,6 +12,12 @@ const RENDERER_METADATA_BY_NAME: Record<string, RendererMetadata> = {
     packageUrl: 'https://github.com/bhouston/material-fidelity/tree/main/packages/renderer-blender',
     observerDescription: "Experimental MaterialX loader for Blender Cycles",
   },
+  'blender-nodes': {
+    rendererName: 'blender-nodes',
+    packageName: '@material-fidelity/renderer-blender',
+    packageUrl: 'https://github.com/bhouston/material-fidelity/tree/main/packages/renderer-blender',
+    observerDescription: 'Experimental MaterialX loader using patched Blender custom nodes',
+  },
   'blender-io-mtlx': {
     rendererName: 'blender-io-mtlx',
     packageName: '@material-fidelity/renderer-blender',

@@ -29,35 +29,47 @@ def register(registry) -> None:
 
 
 def compile_image(context: CompileContext, image_node: Any, output_name: str, scope: Any | None) -> CompiledSocket | None:
-    texture_node = create_image_texture_node(context, image_node, scope)
+    output_type = type_name(image_node) or "color3"
+    texture_node = create_image_texture_node(context, image_node, scope, non_color_default=is_data_image_type(output_type))
     if texture_node is None:
         return None
 
-    if output_name in {"outa", "a", "alpha"}:
-        socket = texture_node.outputs.get("Alpha")
-        return CompiledSocket(socket, "float") if socket is not None else None
-    socket = texture_node.outputs.get("Color")
-    return CompiledSocket(socket, type_name(image_node) or "color3") if socket is not None else None
+    return compiled_texture_output(context, texture_node, output_type, output_name)
 
 
 def compile_gltf_image(context: CompileContext, image_node: Any, output_name: str, scope: Any | None) -> CompiledSocket | None:
+    output_type = "color3" if category(image_node) == "gltf_colorimage" else type_name(image_node) or "color3"
     texture_node = create_image_texture_node(
         context,
         image_node,
         scope,
-        non_color_default=type_name(image_node) == "vector3",
+        non_color_default=is_data_image_type(output_type),
     )
     if texture_node is None:
         return None
 
+    return compiled_texture_output(context, texture_node, output_type, output_name)
+
+
+def compiled_texture_output(
+    context: CompileContext,
+    texture_node: bpy.types.Node,
+    output_type: str,
+    output_name: str,
+) -> CompiledSocket | None:
     if output_name in {"outa", "a", "alpha"}:
         socket = texture_node.outputs.get("Alpha")
         return CompiledSocket(socket, "float") if socket is not None else None
     socket = texture_node.outputs.get("Color")
     if socket is None:
         return None
-    output_type = "color3" if category(image_node) == "gltf_colorimage" else type_name(image_node) or "color3"
+    if output_type == "float":
+        socket = component_socket(context, CompiledSocket(socket, "color3"), 0)
     return CompiledSocket(socket, output_type)
+
+
+def is_data_image_type(output_type: str) -> bool:
+    return output_type not in {"color3", "color4"}
 
 
 def compile_gltf_normalmap(context: CompileContext, image_node: Any, output_name: str, scope: Any | None) -> CompiledSocket | None:

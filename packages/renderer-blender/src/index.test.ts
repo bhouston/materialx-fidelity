@@ -3,7 +3,7 @@ import { access, mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createIoBlenderMtlxRenderer, createRenderer } from './index.js';
+import { createIoBlenderMtlxRenderer, createNodesRenderer, createRenderer } from './index.js';
 
 type UnknownFn = (...args: unknown[]) => unknown;
 
@@ -135,9 +135,28 @@ afterEach(async () => {
 });
 
 describe('blender renderer', () => {
-  it('exposes the default and io_blender_mtlx renderer names', () => {
+  it('exposes the Blender renderer names', () => {
     expect(createRenderer({ thirdPartyRoot: '/tmp/third_party' }).name).toBe('blender-new');
+    expect(createNodesRenderer({ thirdPartyRoot: '/tmp/third_party' }).name).toBe('blender-nodes');
     expect(createIoBlenderMtlxRenderer({ thirdPartyRoot: '/tmp/third_party' }).name).toBe('blender-io-mtlx');
+  });
+
+  it('requires custom MaterialX nodes for the blender-nodes renderer', async () => {
+    spawnSyncMock
+      .mockReturnValueOnce({ status: 0, stdout: 'Blender 5.2.0\n', stderr: '' })
+      .mockReturnValueOnce({ status: 0, stdout: 'Blender 5.2.0\n', stderr: '' })
+      .mockReturnValueOnce({ status: 0, stdout: 'MATERIALX_VERSION=1.39.0\n', stderr: '' })
+      .mockReturnValueOnce({
+        status: 1,
+        stdout: '',
+        stderr: 'RuntimeError: Missing MaterialX custom Blender nodes: ShaderNodeMxNoise2D\n',
+      });
+
+    const renderer = createNodesRenderer({ thirdPartyRoot: '/tmp/third_party' });
+    const result = await renderer.checkPrerequisites();
+
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('Missing MaterialX custom Blender nodes');
   });
 
   it('reports missing Blender prerequisites', async () => {
@@ -218,7 +237,10 @@ describe('blender renderer', () => {
 
     expect(spawnMock).toHaveBeenCalledTimes(2);
     const [templateExecutable, templateArgs] = spawnMock.mock.calls[0] as [string, string[]];
-    expect(templateExecutable).toBe('blender');
+    expect(spawnMock.mock.calls[0]?.[2]).toMatchObject({
+      detached: process.platform !== 'win32',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
     expect(templateArgs).toEqual(
       expect.arrayContaining([
         '--background',
@@ -238,7 +260,7 @@ describe('blender renderer', () => {
 
     const templatePath = getArgValue(templateArgs, '--template-output-path');
     const [renderExecutable, renderArgs] = spawnMock.mock.calls[1] as [string, string[]];
-    expect(renderExecutable).toBe('blender');
+    expect(renderExecutable).toBe(templateExecutable);
     expect(renderArgs).toEqual(
       expect.arrayContaining([
         '--background',

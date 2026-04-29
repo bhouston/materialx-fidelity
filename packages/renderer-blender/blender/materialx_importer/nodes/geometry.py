@@ -28,9 +28,29 @@ def compile_geometry_category(context: CompileContext, category: str) -> Compile
         node = nodes.new(type="ShaderNodeNewGeometry")
         socket = node.outputs.get("Normal")
         return CompiledSocket(socket, "vector3") if socket is not None else None
-    node = nodes.new(type="ShaderNodeNewGeometry")
-    socket = node.outputs.get("Position")
-    return CompiledSocket(socket, "vector3") if socket is not None else None
+    node = nodes.new(type="ShaderNodeTexCoord")
+    socket = node.outputs.get("Object")
+    return materialx_position_socket(context, socket) if socket is not None else None
+
+
+def materialx_position_socket(context: CompileContext, blender_position: bpy.types.NodeSocket) -> CompiledSocket:
+    # MaterialX position defaults to object/model space. Blender supplies that
+    # in its Z-up basis, so convert once at the geometry semantic boundary.
+    separate = context.material.node_tree.nodes.new(type="ShaderNodeSeparateXYZ")
+    context.material.node_tree.links.new(blender_position, separate.inputs["Vector"])
+
+    negate_y = math_socket(
+        context,
+        "MULTIPLY",
+        separate.outputs["Y"],
+        constant_socket(context, -1.0, "float").socket,
+    )
+
+    combine = context.material.node_tree.nodes.new(type="ShaderNodeCombineXYZ")
+    context.material.node_tree.links.new(separate.outputs["X"], combine.inputs["X"])
+    context.material.node_tree.links.new(separate.outputs["Z"], combine.inputs["Y"])
+    context.material.node_tree.links.new(negate_y, combine.inputs["Z"])
+    return CompiledSocket(combine.outputs["Vector"], "vector3")
 
 
 def compile_frame(context: CompileContext, node: Any, output_name: str, scope: Any | None) -> CompiledSocket | None:

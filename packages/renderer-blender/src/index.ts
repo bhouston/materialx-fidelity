@@ -1,4 +1,4 @@
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { access, mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { constants as fsConstants, existsSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -17,7 +17,21 @@ import {
 } from '@material-fidelity/core';
 
 const BLENDER_EXECUTABLE_ENV = 'BLENDER_EXECUTABLE';
+const BLENDER_NODES_EXECUTABLE_ENV = 'BLENDER_NODES_EXECUTABLE';
 const MACOS_APPLICATIONS_DIRECTORY = '/Applications';
+const BLENDER_PROCESS_TERMINATION_GRACE_MS = 1000;
+const MX_NOISE_NODE_TYPES = [
+  'ShaderNodeMxNoise2D',
+  'ShaderNodeMxNoise3D',
+  'ShaderNodeMxFractal2D',
+  'ShaderNodeMxFractal3D',
+  'ShaderNodeMxCellNoise2D',
+  'ShaderNodeMxCellNoise3D',
+  'ShaderNodeMxWorleyNoise2D',
+  'ShaderNodeMxWorleyNoise3D',
+  'ShaderNodeMxUnifiedNoise2D',
+  'ShaderNodeMxUnifiedNoise3D',
+];
 
 interface BlenderVersion {
   major: number;
@@ -31,12 +45,27 @@ interface BlenderRendererOptions {
   minimumBlenderVersion: BlenderVersion;
   requiredThirdPartyFiles?: string[][];
   runtimePythonExpression?: (thirdPartyRoot: string) => string;
+  executableCandidates?: (packageRoot: string) => string[];
+  executableNotFoundMessage?: (candidates: string[]) => string;
 }
 
 const BLENDER_RENDERER_OPTIONS: BlenderRendererOptions = {
   name: 'blender-new',
   scriptFileName: 'render_materialx.py',
   minimumBlenderVersion: { major: 4, minor: 0, patch: 0 },
+};
+
+const BLENDER_NODES_RENDERER_OPTIONS: BlenderRendererOptions = {
+  name: 'blender-nodes',
+  scriptFileName: 'render_materialx.py',
+  minimumBlenderVersion: { major: 4, minor: 0, patch: 0 },
+  executableCandidates: (packageRoot) => [
+    ...optionalEnvCandidate(BLENDER_NODES_EXECUTABLE_ENV),
+    join(packageRoot, '..', '..', '..', 'build_darwin', 'bin', 'Blender.app', 'Contents', 'MacOS', 'Blender'),
+  ],
+  executableNotFoundMessage: (candidates) =>
+    `Unable to locate patched Blender executable for blender-nodes. Set ${BLENDER_NODES_EXECUTABLE_ENV} or build the local Blender checkout. Tried: ${candidates.join(', ')}.`,
+  runtimePythonExpression: () => createMxNoiseNodeProbeExpression(),
 };
 
 const IO_BLENDER_MTLX_RENDERER_OPTIONS: BlenderRendererOptions = {
@@ -65,6 +94,11 @@ function isExecutablePath(candidate: string): boolean {
   } catch {
     return false;
   }
+}
+
+function optionalEnvCandidate(name: string): string[] {
+  const value = process.env[name]?.trim();
+  return value ? [value] : [];
 }
 
 function commandExists(command: string): boolean {
@@ -127,19 +161,42 @@ function discoverMacOSBlenderExecutables(): string[] {
     .map((entry) => join(MACOS_APPLICATIONS_DIRECTORY, entry.name, 'Contents', 'MacOS', 'Blender'));
 }
 
-function resolveExecutable(): string {
+function resolveExecutable(options?: BlenderRendererOptions, packageRoot?: string): string {
   const configuredExecutable = process.env[BLENDER_EXECUTABLE_ENV]?.trim();
   const discoveredExecutables = discoverMacOSBlenderExecutables();
-  const defaultCandidates = ['blender', ...discoveredExecutables];
-  const candidates = configuredExecutable ? [configuredExecutable, ...defaultCandidates] : defaultCandidates;
+  const defaultCandidates = options?.executableCandidates?.(packageRoot ?? '') ?? ['blender', ...discoveredExecutables];
+  const candidates = options?.executableCandidates ? defaultCandidates : configuredExecutable ? [configuredExecutable, ...defaultCandidates] : defaultCandidates;
   const match = candidates.find((candidate) => commandExists(candidate));
   if (!match) {
+    if (options?.executableNotFoundMessage) {
+      throw new Error(options.executableNotFoundMessage(candidates));
+    }
     throw new Error(
       `Unable to locate Blender executable. Set ${BLENDER_EXECUTABLE_ENV} or add blender to PATH. Tried: ${candidates.join(', ')}.`,
     );
   }
 
   return match;
+}
+
+function createMxNoiseNodeProbeExpression(): string {
+  return [
+    'import bpy',
+    `ids = ${JSON.stringify(MX_NOISE_NODE_TYPES)}`,
+    'mat = bpy.data.materials.new("mx_probe")',
+    'mat.use_nodes = True',
+    'nodes = mat.node_tree.nodes',
+    'missing = []',
+    'for node_id in ids:',
+    '    try:',
+    '        probe = nodes.new(type=node_id)',
+    '        nodes.remove(probe)',
+    '    except Exception:',
+    '        missing.append(node_id)',
+    'if missing:',
+    '    raise RuntimeError("Missing MaterialX custom Blender nodes: " + ", ".join(missing))',
+    'print("MATERIALX_CUSTOM_NODES=available")',
+  ].join('\n');
 }
 
 function parseBlenderVersion(output: string): BlenderVersion | undefined {
@@ -207,6 +264,61 @@ function summarizeBlenderFailure(logs: RenderLogEntry[], code: number | null): s
 
   const lastNonQuitMessage = logs.toReversed().find((entry) => entry.message !== 'Blender quit')?.message;
   return lastNonQuitMessage ?? `Blender exited with code ${String(code)}.`;
+}
+
+function killBlenderProcessGroup(processHandle: ChildProcess, signal: NodeJS.Signals): void {
+  if (process.platform === 'win32' || typeof processHandle.pid !== 'number') {
+    return;
+  }
+
+  try {
+    process.kill(-processHandle.pid, signal);
+  } catch (error) {
+    const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
+    if (code !== 'ESRCH') {
+      throw error;
+    }
+  }
+}
+
+function scheduleBlenderProcessGroupCleanup(processHandle: ChildProcess): void {
+  try {
+    killBlenderProcessGroup(processHandle, 'SIGTERM');
+  } catch {
+    return;
+  }
+
+  setTimeout(() => {
+    try {
+      killBlenderProcessGroup(processHandle, 'SIGKILL');
+    } catch {
+      // Best-effort cleanup for leaked Blender descendants.
+    }
+  }, BLENDER_PROCESS_TERMINATION_GRACE_MS).unref();
+}
+
+async function stopActiveBlenderProcesses(activeProcesses: Set<ChildProcess>): Promise<void> {
+  if (activeProcesses.size === 0) {
+    return;
+  }
+
+  for (const processHandle of activeProcesses) {
+    try {
+      killBlenderProcessGroup(processHandle, 'SIGTERM');
+    } catch {
+      // Continue cleanup for the remaining Blender process groups.
+    }
+  }
+
+  await new Promise((resolve) => setTimeout(resolve, BLENDER_PROCESS_TERMINATION_GRACE_MS));
+
+  for (const processHandle of activeProcesses) {
+    try {
+      killBlenderProcessGroup(processHandle, 'SIGKILL');
+    } catch {
+      // The process group may already be gone.
+    }
+  }
 }
 
 function checkBlenderPythonExpression(
@@ -282,12 +394,22 @@ function checkBlenderRuntime(
   return { success: true };
 }
 
-function execute(executable: string, args: string[]): Promise<RenderLogEntry[]> {
+function execute(
+  executable: string,
+  args: string[],
+  activeProcesses: Set<ChildProcess>,
+): Promise<RenderLogEntry[]> {
   return new Promise((resolve, reject) => {
-    const processHandle = spawn(executable, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    const processHandle = spawn(executable, args, {
+      detached: process.platform !== 'win32',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
     const logs: RenderLogEntry[] = [];
     let stdoutBuffer = '';
     let stderrBuffer = '';
+    let settled = false;
+
+    activeProcesses.add(processHandle);
 
     const flushBufferedLines = (buffer: string, level: RenderLogEntry['level']): string => {
       const lines = buffer.split(/\r?\n/);
@@ -305,6 +427,19 @@ function execute(executable: string, args: string[]): Promise<RenderLogEntry[]> 
       return remainder;
     };
 
+    const settle = (callback: () => void): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      activeProcesses.delete(processHandle);
+      processHandle.stdout.removeAllListeners();
+      processHandle.stderr.removeAllListeners();
+      processHandle.removeAllListeners();
+      scheduleBlenderProcessGroupCleanup(processHandle);
+      callback();
+    };
+
     processHandle.stdout.on('data', (chunk) => {
       stdoutBuffer += chunk.toString();
       stdoutBuffer = flushBufferedLines(stdoutBuffer, 'info');
@@ -315,7 +450,7 @@ function execute(executable: string, args: string[]): Promise<RenderLogEntry[]> 
     });
 
     processHandle.on('error', (error) => {
-      reject(createRenderError(error.message, logs));
+      settle(() => reject(createRenderError(error.message, logs)));
     });
 
     processHandle.on('close', (code) => {
@@ -323,12 +458,12 @@ function execute(executable: string, args: string[]): Promise<RenderLogEntry[]> 
       stderrBuffer = flushBufferedLines(`${stderrBuffer}\n`, 'warning');
 
       if (code === 0) {
-        resolve(logs);
+        settle(() => resolve(logs));
         return;
       }
 
       const message = summarizeBlenderFailure(logs, code);
-      reject(createRenderError(message, logs));
+      settle(() => reject(createRenderError(message, logs)));
     });
   });
 }
@@ -346,6 +481,7 @@ class BlenderRenderer implements FidelityRenderer {
   private templateDirectory: string | undefined;
   private templatePath: string | undefined;
   private startOptions: RendererStartOptions | undefined;
+  private readonly activeProcesses = new Set<ChildProcess>();
 
   public constructor(context: RendererContext, options: BlenderRendererOptions) {
     this.name = options.name;
@@ -365,7 +501,7 @@ class BlenderRenderer implements FidelityRenderer {
     }
 
     try {
-      const executable = resolveExecutable();
+      const executable = resolveExecutable(this.options, this.packageRoot);
       const scriptPath = this.scriptPath;
       const missingFiles: string[] = [];
       const requiredFiles = [
@@ -440,10 +576,12 @@ class BlenderRenderer implements FidelityRenderer {
       String(REFERENCE_IMAGE_HEIGHT),
       '--third-party-root',
       this.thirdPartyRoot,
+      '--renderer-name',
+      this.name,
     ];
 
     try {
-      const logs = await execute(this.executable, args);
+      const logs = await execute(this.executable, args, this.activeProcesses);
       try {
         await access(templatePath, fsConstants.R_OK);
       } catch {
@@ -463,6 +601,7 @@ class BlenderRenderer implements FidelityRenderer {
     this.templateDirectory = undefined;
     this.templatePath = undefined;
     this.startOptions = undefined;
+    await stopActiveBlenderProcesses(this.activeProcesses);
     if (templateDirectory) {
       await rm(templateDirectory, { recursive: true, force: true });
     }
@@ -498,15 +637,21 @@ class BlenderRenderer implements FidelityRenderer {
       String(REFERENCE_IMAGE_HEIGHT),
       '--third-party-root',
       this.thirdPartyRoot,
+      '--renderer-name',
+      this.name,
     ];
 
-    const logs = await execute(this.executable, args);
+    const logs = await execute(this.executable, args, this.activeProcesses);
     return { logs };
   }
 }
 
 export function createRenderer(context: RendererContext): FidelityRenderer {
   return new BlenderRenderer(context, BLENDER_RENDERER_OPTIONS);
+}
+
+export function createNodesRenderer(context: RendererContext): FidelityRenderer {
+  return new BlenderRenderer(context, BLENDER_NODES_RENDERER_OPTIONS);
 }
 
 export function createIoBlenderMtlxRenderer(context: RendererContext): FidelityRenderer {

@@ -114,7 +114,7 @@ def create_template(args: argparse.Namespace, warnings: list[str]) -> None:
         args.background_color,
         warnings,
     )
-    log_warnings_event("blender-new-template-create", warnings)
+    log_warnings_event(f"{args.renderer_name}-template-create", warnings)
     time_call(
         timings,
         "save_mainfile",
@@ -131,7 +131,7 @@ def create_template(args: argparse.Namespace, warnings: list[str]) -> None:
     print(
         json.dumps(
             {
-                "event": "blender-new-template-finish",
+                "event": f"{args.renderer_name}-template-finish",
                 "output": args.template_output_path,
             }
         )
@@ -165,7 +165,7 @@ def render_from_template(args: argparse.Namespace, warnings: list[str]) -> None:
         normalized_root,
         material_result.material,
     )
-    log_warnings_event("blender-new-render-start", warnings)
+    log_warnings_event(f"{args.renderer_name}-render-start", warnings)
     time_call(timings, "cycles_render", bpy.ops.render.render, write_still=True)
     timings["total"] = elapsed_ms(started_at)
     # log_timing_event(
@@ -178,7 +178,7 @@ def render_from_template(args: argparse.Namespace, warnings: list[str]) -> None:
     print(
         json.dumps(
             {
-                "event": "blender-new-render-finish",
+                "event": f"{args.renderer_name}-render-finish",
                 "output": args.output_png_path,
             }
         )
@@ -233,6 +233,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--width", type=int, required=True)
     parser.add_argument("--height", type=int, required=True)
     parser.add_argument("--third-party-root")
+    parser.add_argument("--renderer-name", default="blender-new")
     args = parser.parse_args(passthrough_args)
 
     if args.template_output_path:

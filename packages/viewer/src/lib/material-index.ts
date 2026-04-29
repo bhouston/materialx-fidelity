@@ -2,6 +2,7 @@ import { access, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import {
   createIoBlenderMtlxRenderer,
+  createNodesRenderer as createBlenderNodesRenderer,
   createRenderer as createBlenderRenderer,
 } from '@material-fidelity/renderer-blender';
 import { createRenderer as createMaterialXJsRenderer } from '@material-fidelity/renderer-materialxjs';
@@ -20,6 +21,7 @@ const RENDERER_CATEGORY_ORDER = ['pathtracer', 'raytracer', 'rasterizer'] as con
 const RENDERER_NAME_ORDER = [
   'materialxview',
   'blender-new',
+  'blender-nodes',
   'blender-io-mtlx',
   'materialxjs',
   'threejs-current',
@@ -209,6 +211,7 @@ async function discoverMaterialFiles(rootDir: string): Promise<string[]> {
 function getBuiltInRenderers(thirdPartyRoot: string): BuiltInRendererDescriptor[] {
   const renderers = [
     createBlenderRenderer({ thirdPartyRoot }),
+    createBlenderNodesRenderer({ thirdPartyRoot }),
     createIoBlenderMtlxRenderer({ thirdPartyRoot }),
     createMaterialXJsRenderer({ thirdPartyRoot }),
     createMaterialXViewRenderer(),
