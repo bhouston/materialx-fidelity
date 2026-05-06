@@ -49,6 +49,10 @@ function toMaterialZipUrl(materialType: string, materialName: string): string {
   return `${toViewerOrigin(resolveViewerHostName())}/api/asset/${encodeURIComponent(materialType)}/${encodeURIComponent(materialName)}.mtlx.zip`;
 }
 
+function toMaterialSourceUrl(materialType: string, materialName: string): string {
+  return `/api/material-source/${encodeURIComponent(materialType)}/${encodeURIComponent(materialName)}`;
+}
+
 function toLiveViewerUrl(materialType: string, materialName: string): string {
   const materialUrl = toMaterialZipUrl(materialType, materialName);
   return `${HOMAGE_VIEWER_BASE_URL}/?sourceUrl=${encodeURIComponent(materialUrl)}`;
@@ -83,6 +87,7 @@ export interface MaterialViewModel {
   sourceUrl: string;
   liveViewerUrl: string;
   downloadMtlxZipUrl: string;
+  materialSourceUrl: string;
   images: Record<string, string | null>;
   imageHashes: Record<string, string | null>;
   reports: Record<string, string | null>;
@@ -266,6 +271,7 @@ async function buildViewerIndexData(): Promise<ViewerIndexViewModel> {
       sourceUrl: toGithubSourceUrl(descriptor.relativeDirectory),
       liveViewerUrl: toLiveViewerUrl(descriptor.apiType, descriptor.apiName),
       downloadMtlxZipUrl: toMaterialZipUrl(descriptor.apiType, descriptor.apiName),
+      materialSourceUrl: toMaterialSourceUrl(descriptor.apiType, descriptor.apiName),
       images,
       imageHashes,
       reports,

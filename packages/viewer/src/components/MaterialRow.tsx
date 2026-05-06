@@ -1,8 +1,7 @@
-import { DownloadIcon, ExternalLink, Info } from 'lucide-react';
+import { DownloadIcon, ExternalLink, FileText } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { MaterialViewModel, RendererCategoryGroupViewModel } from '#/lib/material-index';
-import { getRendererMetadata } from '#/lib/renderer-metadata';
-import { cn } from '#/lib/utils';
+import { MaterialCell } from './MaterialCell';
 
 function toAnchorId(value: string): string {
   return value
@@ -15,67 +14,17 @@ interface MaterialRowProps {
   material: MaterialViewModel;
   rendererGroups: RendererCategoryGroupViewModel[];
   onTrackMaterialAction: (action: 'download_mtlx' | 'open_live_viewer', material: MaterialViewModel) => void;
+  onInspectMaterial: (material: { materialName: string; materialSourceUrl: string }) => void;
   onOpenReport: (report: { materialName: string; rendererName: string; reportUrl: string }) => void;
 }
 
-function formatMetricValue(value: number | null | undefined, digits = 3): string {
-  return value == null ? '-' : value.toFixed(digits);
-}
-
-type MetricSeverity = 'none' | 'warning' | 'error';
-
-function getPsnrSeverity(value: number | null): MetricSeverity {
-  if (value === null) {
-    return 'none';
-  }
-
-  if (value <= 20) {
-    return 'error';
-  }
-  if (value <= 24) {
-    return 'warning';
-  }
-  return 'none';
-}
-
-function getMetricValueClassName(severity: MetricSeverity): string {
-  if (severity === 'error') {
-    return 'rounded-sm bg-red-100 px-1 text-red-950 dark:bg-red-950/50 dark:text-red-100';
-  }
-
-  if (severity === 'warning') {
-    return 'rounded-sm bg-orange-100 px-1 text-orange-950 dark:bg-orange-950/50 dark:text-orange-100';
-  }
-
-  return 'text-foreground';
-}
-
-function RendererMetrics({ metrics }: { metrics: MaterialViewModel['metrics'][string] }) {
-  return (
-    <dl className="grid grid-cols-1 gap-y-0.5 text-[11px] leading-4 text-muted-foreground">
-      <div className="flex justify-between gap-1">
-        <dt>PSNR</dt>
-        <dd className={cn('font-mono', getMetricValueClassName(getPsnrSeverity(metrics?.psnr ?? null)))}>
-          {formatMetricValue(metrics?.psnr, 1)}
-        </dd>
-      </div>
-    </dl>
-  );
-}
-
-function getReportButtonClassName(summary: MaterialViewModel['reportSummaries'][string]): string {
-  if (summary?.severity === 'error') {
-    return 'border-red-600 bg-red-600 text-white hover:bg-red-700 dark:border-red-500 dark:bg-red-600 dark:text-white dark:hover:bg-red-700';
-  }
-
-  if (summary?.severity === 'warning') {
-    return 'border-orange-400 bg-orange-400 text-black hover:bg-orange-500 dark:border-orange-400 dark:bg-orange-400 dark:text-black dark:hover:bg-orange-500';
-  }
-
-  return 'border-border bg-background/85 text-foreground hover:bg-background';
-}
-
-export function MaterialRow({ material, rendererGroups, onTrackMaterialAction, onOpenReport }: MaterialRowProps) {
+export function MaterialRow({
+  material,
+  rendererGroups,
+  onTrackMaterialAction,
+  onInspectMaterial,
+  onOpenReport,
+}: MaterialRowProps) {
   const materialId = toAnchorId(material.id);
   const rowContentRef = useRef<HTMLDivElement | null>(null);
   const [shouldRenderContent, setShouldRenderContent] = useState(false);
@@ -120,6 +69,19 @@ export function MaterialRow({ material, rendererGroups, onTrackMaterialAction, o
           </a>
         </h3>
         <div className="ml-auto flex flex-wrap items-center justify-end gap-2 text-sm">
+          <button
+            className="inline-flex items-center gap-1 rounded-none border border-border bg-muted/40 px-2.5 py-1.5 font-normal text-foreground transition-colors hover:border-primary/40 hover:bg-muted/60"
+            onClick={() =>
+              onInspectMaterial({
+                materialName: material.displayPath,
+                materialSourceUrl: material.materialSourceUrl,
+              })
+            }
+            type="button"
+          >
+            <FileText className="size-3.5" />
+            <span>Source</span>
+          </button>
           <a
             className="inline-flex items-center gap-1 rounded-none border border-border bg-muted/40 px-2.5 py-1.5 font-normal text-foreground transition-colors hover:border-primary/40 hover:bg-muted/60"
             download
@@ -142,66 +104,20 @@ export function MaterialRow({ material, rendererGroups, onTrackMaterialAction, o
       </div>
 
       <div className="mt-3 -mx-4 overflow-x-auto px-4 pb-2 sm:-mx-6 sm:px-6" ref={rowContentRef}>
-        <div className="flex w-max min-w-full justify-start gap-4 lg:justify-center">
+        <div className="flex w-max min-w-full justify-start gap-px lg:justify-center">
           {rendererGroups.map((rendererGroup, groupIndex) => (
-            <div key={rendererGroup.category} className="flex flex-none items-stretch gap-4">
-              {rendererGroup.renderers.map((rendererName) => {
-                if (!shouldRenderContent) {
-                  return (
-                    <figure key={rendererName} className="flex w-[170px] flex-none flex-col gap-2 sm:w-[200px]">
-                      <div className="flex aspect-square w-full items-center justify-center border border-dashed border-border bg-muted/20 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        not loaded
-                      </div>
-                      <figcaption className="text-center text-xs text-muted-foreground">
-                        <p className="font-medium text-foreground">{rendererName}</p>
-                      </figcaption>
-                    </figure>
-                  );
-                }
-
-                const imageUrl = material.images[rendererName];
-                const reportUrl = material.reports[rendererName];
-                const reportSummary = material.reportSummaries[rendererName] ?? null;
-                const metrics = material.metrics[rendererName] ?? null;
-                const metadata = getRendererMetadata(rendererName);
-                return (
-                  <figure key={rendererName} className="flex w-[170px] flex-none flex-col gap-2 sm:w-[200px]">
-                    <div className="relative">
-                      {imageUrl ? (
-                        <img
-                          alt={`${material.name} rendered by ${rendererName}`}
-                          className="aspect-square w-full border border-border object-cover"
-                          loading="lazy"
-                          src={imageUrl}
-                        />
-                      ) : (
-                        <div className="flex aspect-square w-full items-center justify-center border border-dashed border-border text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          missing
-                        </div>
-                      )}
-                      {reportUrl ? (
-                        <button
-                          aria-label={`Show render report for ${material.name} on ${rendererName}`}
-                          className={cn(
-                            'absolute right-2 bottom-2 inline-flex size-7 items-center justify-center rounded-full border shadow-sm backdrop-blur-sm transition-colors',
-                            getReportButtonClassName(reportSummary),
-                          )}
-                          onClick={() => onOpenReport({ materialName: material.name, rendererName, reportUrl })}
-                          type="button"
-                        >
-                          <Info className="size-4" />
-                        </button>
-                      ) : null}
-                    </div>
-                    <RendererMetrics metrics={metrics} />
-                    <figcaption className="text-center text-xs text-muted-foreground">
-                      <p className="font-medium text-foreground">{rendererName}</p>
-                     </figcaption>
-                  </figure>
-                );
-              })}
+            <div key={rendererGroup.category} className="flex flex-none items-stretch gap-px">
+              {rendererGroup.renderers.map((rendererName) => (
+                <MaterialCell
+                  key={rendererName}
+                  material={material}
+                  onOpenReport={onOpenReport}
+                  rendererName={rendererName}
+                  shouldRenderContent={shouldRenderContent}
+                />
+              ))}
               {groupIndex < rendererGroups.length - 1 ? (
-                <div aria-hidden="true" className="my-1 w-px self-stretch bg-border" />
+                <div aria-hidden="true" className="mx-2 my-1 w-0.5 self-stretch bg-border/80" />
               ) : null}
             </div>
           ))}

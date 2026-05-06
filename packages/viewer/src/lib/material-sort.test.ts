@@ -20,6 +20,7 @@ function material(
     sourceUrl: '',
     liveViewerUrl: '',
     downloadMtlxZipUrl: '',
+    materialSourceUrl: '',
     images: Object.fromEntries(
       Object.entries(rendererData).map(([rendererName, data]) => [
         rendererName,

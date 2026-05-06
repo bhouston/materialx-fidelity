@@ -6,7 +6,7 @@
   "files": [],
   "include": [],
   "references": [
-    { "path": "./third_party/material-viewer/packages/materialx" },
+    { "path": "./third_party/material-viewer/packages/mtlx-core" },
     { "path": "./third_party/material-viewer/packages/materialx-three" },
     { "path": "./packages/samples" },
     { "path": "./packages/samples-io" },

@@ -5,8 +5,10 @@ import { useEffect, useRef, useState } from 'react';
 import { useGoogleAnalytics } from 'tanstack-router-ga4';
 import Header from '#/components/Header';
 import { MaterialRow } from '#/components/MaterialRow';
+import { MaterialSourceDialog } from '#/components/MaterialSourceDialog';
 import { RenderReportDialog } from '#/components/RenderReportDialog';
 import { resolveSelectedRenderers, toRendererSearchValue } from '#/components/SelectRenderersDialog';
+import type { ActiveMaterialSourceState } from '#/components/MaterialSourceDialog';
 import type { ActiveReportState } from '#/components/RenderReportDialog';
 import { getViewerIndexData } from '#/lib/material-index';
 import {
@@ -89,6 +91,7 @@ function App() {
     }))
     .filter((group) => group.renderers.length > 0);
   const [activeReport, setActiveReport] = useState<ActiveReportState | null>(null);
+  const [activeMaterialSource, setActiveMaterialSource] = useState<ActiveMaterialSourceState | null>(null);
   const hasMaterialFilterChangedRef = useRef(false);
   const lastTrackedMaterialFilterRef = useRef(search.materials?.trim() ?? '');
   const filteredGroups = data.groups
@@ -333,6 +336,7 @@ function App() {
               <MaterialRow
                 key={material.id}
                 material={material}
+                onInspectMaterial={setActiveMaterialSource}
                 onOpenReport={setActiveReport}
                 onTrackMaterialAction={trackMaterialAction}
                 rendererGroups={visibleRendererGroups}
@@ -345,6 +349,9 @@ function App() {
           )}
         </section>
 
+        {activeMaterialSource ? (
+          <MaterialSourceDialog material={activeMaterialSource} onClose={() => setActiveMaterialSource(null)} />
+        ) : null}
         {activeReport ? <RenderReportDialog report={activeReport} onClose={() => setActiveReport(null)} /> : null}
       </main>
     </>

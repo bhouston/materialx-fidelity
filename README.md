@@ -4,7 +4,7 @@ The Material Fidelity Suite (avalable here online: https://material-fidelity.ben
 
 ![MaterialX showcase — materialxview vs Three.js vs Blender](docs/images/materialx-showcase.webp)
 
-Every material is rendered through the `materialxview` reference tool (ray tracer) and compared side-by-side against Three.js (rasterizer) and Blender Eevee/Cycles. The suite covers 400+ materials across `standard_surface`, `gltf_pbr`, and `open_pbr_surface`, including procedural noise, math nodes, compositing, coordinate transforms, and surface-model variants.
+Every material is rendered through MaterialX reference backends and compared side-by-side against Three.js (rasterizer) and Blender Eevee/Cycles. The suite covers 400+ materials across `standard_surface`, `gltf_pbr`, and `open_pbr_surface`, including procedural noise, math nodes, compositing, coordinate transforms, and surface-model variants.
 
 ![MaterialX 2D noise — reference vs Blender before and after](docs/images/materialx-noise2d.webp)
 
@@ -27,7 +27,9 @@ Every material is rendered through the `materialxview` reference tool (ray trace
 
 - Node.js 24+
 - pnpm 10+
-- `materialxview` (or `MaterialXView`) available on your `PATH`
+- `materialx-glsl` available on your `PATH` for the GLSL reference backend
+- `materialx-metal` available on your `PATH` for the Metal reference backend on macOS
+- `materialx-osl` available on your `PATH` for the OSL reference backend
 - Blender 4.0+ available as `blender` on your `PATH` or via `BLENDER_EXECUTABLE` (`blender-new`, `blender-nodes`, and `blender-eevee-nodes` use the `third_party/blender-materialx-importer` submodule; `blender-nodes` and `blender-eevee-nodes` require the patched Blender executable or `BLENDER_NODES_EXECUTABLE`)
 
 ## Install
@@ -69,7 +71,7 @@ pnpm cli render --renderers threejs-new --materials open_pbr
 
 This command writes `<renderer-name>.png` in each directory containing a `.mtlx` material file.
 
-Calculate visual similarity metrics against each material's `materialxview.png` reference:
+Calculate visual similarity metrics against each material's `materialx-glsl.png` reference:
 
 ```bash
 # all renderers, all materials
@@ -81,11 +83,13 @@ pnpm cli metrics
 pnpm cli metrics --renderers threejs-current,threejs-new --materials open_pbr
 ```
 
-This command writes `metrics.json` in each directory containing a `.mtlx` material file and a `materialxview.png` reference. Each file is keyed by renderer name and contains `ssim`, `psnr`, `normalizedRgbRms`, and `vmaf` values. VMAF is calculated when `ffmpeg` with `libvmaf` is available on `PATH`; otherwise the command continues with the still-image metrics and writes `vmaf: null`.
+This command writes `metrics.json` in each directory containing a `.mtlx` material file and a `materialx-glsl.png` reference. Each file is keyed by renderer name and contains a `psnr` value.
 
 Currently supported renderers:
 
-- `materialxview` (`@material-fidelity/renderer-materialxview`)
+- `materialx-glsl` (`@material-fidelity/renderer-materialxview`, MaterialXView OpenGL/GLSL)
+- `materialx-metal` (`@material-fidelity/renderer-materialxview`, MaterialXView Metal/MSL)
+- `materialx-osl` (`@material-fidelity/renderer-materialxview`, MaterialX OSL)
 - `blender-new` (`@material-fidelity/renderer-blender`, Blender bundled MaterialX rendered through Cycles)
 - `blender-nodes` (`@material-fidelity/renderer-blender`, patched Blender custom MaterialX nodes rendered through Cycles)
 - `blender-eevee-nodes` (`@material-fidelity/renderer-blender`, patched Blender custom MaterialX nodes rendered through Eevee)
@@ -99,7 +103,7 @@ Optional flags:
 - `--concurrency <number>` optional render concurrency; defaults to the recommended available parallelism, with a minimum of `1`
 - `--skip-existing` only render renderer/material pairs whose `<renderer-name>.png` output does not already exist
 
-The `metrics` command supports the same `--renderers`, `--materials`, and `--concurrency` filters, plus `--no-vmaf` to skip VMAF calculation.
+The `metrics` command supports the same `--renderers`, `--materials`, and `--concurrency` filters.
 
 ## Material Organization
 
@@ -123,7 +127,7 @@ Each node gets its own directory and `<node-name>.mtlx`, with phase planning doc
 
 ```bash
 # single material (run from repo root)
-pnpm --filter @material-viewer/materialx-cli start validate "$PWD/third_party/material-samples/materials/surfaces/gltf_pbr/node_isolation/add/add.mtlx"
+pnpm --filter @material-viewer/mtlx start check "$PWD/third_party/material-samples/materials/surfaces/gltf_pbr/node_isolation/add/add.mtlx"
 ```
 
 ```bash
@@ -136,7 +140,7 @@ root = Path.cwd()
 files = sorted((root / "third_party/material-samples/materials/surfaces/gltf_pbr/node_isolation").glob("*/*.mtlx"))
 for file in files:
     subprocess.run(
-        ["pnpm", "--filter", "@material-viewer/materialx-cli", "start", "validate", str(file)],
+        ["pnpm", "--filter", "@material-viewer/mtlx", "start", "check", str(file)],
         check=True,
     )
 print(f"Validated {len(files)} materials.")
@@ -171,7 +175,7 @@ Coverage and rename artifacts:
 
 ## Reference Renderer Setup
 
-To keep reference renders visually comparable between `materialxview`, `threejs-new`, and `threejs-current`, these renderers should follow this framing setup:
+To keep reference renders visually comparable between `materialx-glsl`, `materialx-metal`, `threejs-new`, and `threejs-current`, these renderers should follow this framing setup:
 
 - camera: perspective, FOV `45`, near `0.05`, eye `(0,0,5)`, look target `(0,0,0)`
 - model normalization: center the loaded `ShaderBall.glb` at the origin, then scale it so the bounding-box sphere radius is `2.0` (matching `MaterialXView`'s `IDEAL_MESH_SPHERE_RADIUS`)
@@ -195,11 +199,11 @@ Run the MaterialX Fidelity Viewer:
 pnpm viewer
 ```
 
-The viewer scans MaterialX materials and looks for images for the built-in renderer list (`materialxview`, `blender-new`, `blender-nodes`, `blender-eevee-nodes`, `threejs-current`, `threejs-new`).
+The viewer scans MaterialX materials and looks for images for the built-in renderer list (`materialx-glsl`, `materialx-metal`, `materialx-osl`, `blender-new`, `blender-nodes`, `blender-eevee-nodes`, `threejs-current`, `threejs-new`).
 
 The page groups materials by purpose/type (`showcase`, `nodes`, `open_pbr_surface`, `gltf_pbr`, `standard_surface`) and displays each renderer image (`<renderer>.png`) side by side. Missing images render as a placeholder tile.
-When the URL does not include a `renderers` filter, the viewer defaults to showing `materialxview`, `blender-nodes`, `blender-eevee-nodes`, and `threejs-new`; users can enable the other built-in renderers from the renderer filter UI.
-If a material directory contains `metrics.json`, the viewer displays each renderer's metrics beneath its image. Material rows render lightweight placeholders until they are near the viewport, then load the image tiles, render reports, and metrics for smoother browsing.
+When the URL does not include a `renderers` filter, the viewer defaults to showing `materialx-glsl`, `materialx-metal`, `materialx-osl`, `blender-nodes`, `blender-eevee-nodes`, and `threejs-new`; users can enable the other built-in renderers from the renderer filter UI.
+If a material directory contains `metrics.json`, the viewer displays each renderer's PSNR beneath its image. Material rows render lightweight placeholders until they are near the viewport, then load the image tiles, render reports, and metrics for smoother browsing.
 
 ## License
 
