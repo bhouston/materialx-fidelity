@@ -24,23 +24,23 @@ export function toMaterialSortSearchValue(value: MaterialSortValue): string | un
   return value === DEFAULT_MATERIAL_SORT ? undefined : value;
 }
 
-export function getMaterialQuality(material: MaterialViewModel, selectedRenderers: string[]): number {
+export function getMaterialQuality(material: MaterialViewModel, selectedRenderers: string[]): number | null {
   if (selectedRenderers.length === 0) {
-    return 0;
+    return null;
   }
 
   let lowestPsnr = Number.POSITIVE_INFINITY;
 
   for (const rendererName of selectedRenderers) {
     const psnr = material.metrics[rendererName]?.psnr;
-    if (!material.images[rendererName] || psnr == null || !Number.isFinite(psnr)) {
-      return 0;
+    if (psnr == null || !Number.isFinite(psnr)) {
+      continue;
     }
 
     lowestPsnr = Math.min(lowestPsnr, psnr);
   }
 
-  return lowestPsnr;
+  return Number.isFinite(lowestPsnr) ? lowestPsnr : null;
 }
 
 function compareMaterialNames(left: MaterialViewModel, right: MaterialViewModel): number {
@@ -51,8 +51,24 @@ function compareMaterialQuality(
   left: MaterialViewModel,
   right: MaterialViewModel,
   selectedRenderers: string[],
+  direction: 1 | -1,
 ): number {
-  const qualityDelta = getMaterialQuality(left, selectedRenderers) - getMaterialQuality(right, selectedRenderers);
+  const leftQuality = getMaterialQuality(left, selectedRenderers);
+  const rightQuality = getMaterialQuality(right, selectedRenderers);
+
+  if (leftQuality === null && rightQuality === null) {
+    return compareMaterialNames(left, right);
+  }
+
+  if (leftQuality === null) {
+    return 1;
+  }
+
+  if (rightQuality === null) {
+    return -1;
+  }
+
+  const qualityDelta = (leftQuality - rightQuality) * direction;
   return qualityDelta === 0 ? compareMaterialNames(left, right) : qualityDelta;
 }
 
@@ -67,9 +83,9 @@ export function sortMaterials(
     case 'name-reversed':
       return materials.toSorted((left, right) => compareMaterialNames(right, left));
     case 'psnr':
-      return materials.toSorted((left, right) => compareMaterialQuality(left, right, selectedRenderers));
+      return materials.toSorted((left, right) => compareMaterialQuality(left, right, selectedRenderers, 1));
     case 'psnr-reversed':
-      return materials.toSorted((left, right) => compareMaterialQuality(right, left, selectedRenderers));
+      return materials.toSorted((left, right) => compareMaterialQuality(left, right, selectedRenderers, -1));
     case DEFAULT_MATERIAL_SORT:
       return materials;
   }

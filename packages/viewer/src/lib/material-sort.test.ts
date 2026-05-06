@@ -63,20 +63,35 @@ describe('material sort', () => {
     expect(getMaterialQuality(sample, ['first', 'second'])).toBe(24);
   });
 
-  it('scores quality as zero when a selected renderer result is missing', () => {
+  it('skips missing selected renderer PSNR values when scoring quality', () => {
     const sample = material('sample', {
       first: { hasImage: true, psnr: 31 },
       second: { hasImage: false, psnr: 24 },
+      third: { hasImage: true, psnr: null },
     });
 
-    expect(getMaterialQuality(sample, ['first', 'second'])).toBe(0);
+    expect(getMaterialQuality(sample, ['first', 'second', 'third'])).toBe(24);
   });
 
-  it('sorts by metric using selected renderers only', () => {
-    const missingSelectedResult = material('missing', {
+  it('scores quality as unknown when no selected renderer has a known PSNR', () => {
+    const sample = material('sample', {
+      first: { hasImage: false, psnr: undefined },
+      second: { hasImage: true, psnr: null },
+    });
+
+    expect(getMaterialQuality(sample, ['first', 'second'])).toBeNull();
+  });
+
+  it('sorts by PSNR using selected renderers only', () => {
+    const partialSelectedResult = material('partial', {
       first: { hasImage: true, psnr: 35 },
-      second: { hasImage: false, psnr: 18 },
+      second: { hasImage: false, psnr: undefined },
       ignored: { hasImage: true, psnr: 2 },
+    });
+    const unknownSelectedPsnr = material('unknown', {
+      first: { hasImage: false, psnr: undefined },
+      second: { hasImage: true, psnr: null },
+      ignored: { hasImage: true, psnr: 1 },
     });
     const lowSelectedPsnr = material('low', {
       first: { hasImage: true, psnr: 21 },
@@ -90,15 +105,16 @@ describe('material sort', () => {
     });
 
     expect(
-      sortMaterials([highSelectedPsnr, lowSelectedPsnr, missingSelectedResult], 'psnr', ['first', 'second']).map(
-        (entry) => entry.name,
-      ),
-    ).toEqual(['missing', 'low', 'high']);
-    expect(
-      sortMaterials([missingSelectedResult, lowSelectedPsnr, highSelectedPsnr], 'psnr-reversed', [
+      sortMaterials([unknownSelectedPsnr, highSelectedPsnr, lowSelectedPsnr, partialSelectedResult], 'psnr', [
         'first',
         'second',
       ]).map((entry) => entry.name),
-    ).toEqual(['high', 'low', 'missing']);
+    ).toEqual(['low', 'partial', 'high', 'unknown']);
+    expect(
+      sortMaterials([unknownSelectedPsnr, partialSelectedResult, lowSelectedPsnr, highSelectedPsnr], 'psnr-reversed', [
+        'first',
+        'second',
+      ]).map((entry) => entry.name),
+    ).toEqual(['high', 'partial', 'low', 'unknown']);
   });
 });
