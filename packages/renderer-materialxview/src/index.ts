@@ -129,6 +129,7 @@ function execute(executable: string, args: string[], rendererName: string): Prom
 interface MaterialXViewRendererOptions {
   name: string;
   executableCandidates: string[];
+  supportsShadowsOption?: boolean;
 }
 
 class MaterialXViewRenderer implements FidelityRenderer {
@@ -199,11 +200,13 @@ class MaterialXViewRenderer implements FidelityRenderer {
       'false',
       '--shadowMap',
       'false',
-      '--shadows',
-      'false',
       '--captureFilename',
       options.outputPngPath,
     ];
+
+    if (this.options.supportsShadowsOption) {
+      args.push('--shadows', 'false');
+    }
 
     const searchPaths = uniqueSearchPaths([
       ...(process.env[MATERIALXVIEW_SEARCH_PATH_ENV]?.split(delimiter) ?? []),
@@ -240,5 +243,6 @@ export function createOslRenderer(): FidelityRenderer {
   return new MaterialXViewRenderer({
     name: 'materialx-osl',
     executableCandidates: OSL_EXECUTABLE_CANDIDATES,
+    supportsShadowsOption: true,
   });
 }
