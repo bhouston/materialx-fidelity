@@ -20,6 +20,14 @@ The renderer package automatically prefers these paths before falling back to `m
 - **Open Shading Language (`oslc`, `testrender`)** — required **only** for the **`materialx-osl`** renderer. MaterialX does not ship OSL; point CMake at a consistent install (for example build OSL from **`third_party/OpenShadingLanguage`** into `build/osl-dist/` — see [building-openshadinglanguage.md](building-openshadinglanguage.md)). You can also use Homebrew or another install if you set `MATERIALX_OSL_BINARY_*` accordingly.
 - Nested MaterialX submodules (NanoGUI, etc.): from `third_party/MaterialX`, run `git submodule update --init --recursive`.
 
+## Build type (Release vs Debug)
+
+These recipes pass **`-DCMAKE_BUILD_TYPE=Release`** so reference renders use **optimized** binaries.
+
+MaterialX’s CMake does **not** default `CMAKE_BUILD_TYPE` for single-configuration generators (Ninja); without an explicit type, the cache can stay **empty** and you may not get normal Release optimizations. By contrast, **Open Shading Language** (`third_party/OpenShadingLanguage`) sets **`Release`** when `CMAKE_BUILD_TYPE` is unset, and **Blender** initializes **`CMAKE_BUILD_TYPE`** to **`Release`** unless you override it (see [BUILDING_BLENDER.md](BUILDING_BLENDER.md)).
+
+For debugging MaterialX or renderers, reconfigure with **`-DCMAKE_BUILD_TYPE=Debug`** (or **`RelWithDebInfo`**) in the same build directory.
+
 ## Context minimization (log files)
 
 CMake configure steps and `cmake --build` runs print large volumes of text. In LLM-assisted sessions (for example Cursor agents), piping that output into the conversation wastes context and buries compiler errors.
@@ -31,6 +39,7 @@ CMake configure steps and `cmake --build` runs print large volumes of text. In L
    ```bash
    mkdir -p build/logs
    cmake -S "$PWD/third_party/MaterialX" -B "$PWD/build/materialx-glsl" -G Ninja \
+     -DCMAKE_BUILD_TYPE=Release \
      -DMATERIALX_BUILD_VIEWER=ON ... \
      >> build/logs/cmake-materialx-glsl.log 2>&1
    cmake --build "$PWD/build/materialx-glsl" --target MaterialXView \
@@ -58,6 +67,7 @@ On macOS, force the OpenGL backend so this build can be used as the `materialx-g
 cmake -S "$PWD/third_party/MaterialX" \
   -B "$PWD/build/materialx-glsl" \
   -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
   -DMATERIALX_BUILD_VIEWER=ON \
   -DMATERIALX_BUILD_RENDER=ON \
   -DMATERIALX_BUILD_RENDER_PLATFORMS=ON \
@@ -76,6 +86,7 @@ Build a separate Metal-backed MaterialXView for the `materialx-metal` reference 
 cmake -S "$PWD/third_party/MaterialX" \
   -B "$PWD/build/materialx-metal" \
   -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
   -DMATERIALX_BUILD_VIEWER=ON \
   -DMATERIALX_BUILD_RENDER=ON \
   -DMATERIALX_BUILD_RENDER_PLATFORMS=ON \
@@ -97,6 +108,7 @@ Configure the OSL renderer with explicit paths to **`oslc`** and **`testrender`*
 cmake -S "$PWD/third_party/MaterialX" \
   -B "$PWD/build/materialx-osl" \
   -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
   -DMATERIALX_BUILD_VIEWER=OFF \
   -DMATERIALX_BUILD_RENDER=ON \
   -DMATERIALX_BUILD_RENDER_PLATFORMS=ON \
@@ -113,6 +125,7 @@ mkdir -p build/logs
 cmake -S "$PWD/third_party/MaterialX" \
   -B "$PWD/build/materialx-osl" \
   -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
   -DMATERIALX_BUILD_VIEWER=OFF \
   -DMATERIALX_BUILD_RENDER=ON \
   -DMATERIALX_BUILD_RENDER_PLATFORMS=ON \

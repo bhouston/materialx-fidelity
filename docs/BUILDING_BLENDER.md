@@ -33,7 +33,9 @@ export SDKROOT="$DEVELOPER_DIR/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26
 
 ## One-Time Configure
 
-Run from the material-fidelity repository root:
+Run from the material-fidelity repository root.
+
+Blender’s CMake initializes **`CMAKE_BUILD_TYPE`** to **`Release`** when unset, so the default configure is an **optimized** build. You can still pass **`-DCMAKE_BUILD_TYPE=Release`** or **`-DCMAKE_BUILD_TYPE=Debug`** explicitly.
 
 ```bash
 DEVELOPER_DIR="/Applications/Xcode-26.1.1.app/Contents/Developer" \
@@ -41,6 +43,7 @@ SDKROOT="/Applications/Xcode-26.1.1.app/Contents/Developer/Platforms/MacOSX.plat
 cmake -S "$PWD/third_party/blender" \
   -B "$PWD/build/blender" \
   -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_OSX_SYSROOT="/Applications/Xcode-26.1.1.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk"
 ```
 

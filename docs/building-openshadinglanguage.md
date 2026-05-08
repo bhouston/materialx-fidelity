@@ -17,6 +17,8 @@ OSL depends on LLVM, OpenImageIO, Imath, and other libraries. Follow the upstrea
 
 On macOS, Homebrew packages such as `llvm`, `openimageio`, `imath`, `flex`, `bison`, `pugixml`, and **`fmt`** are commonly used; exact versions are listed in that file.
 
+OSL’s CMake defaults **`CMAKE_BUILD_TYPE`** to **`Release`** when it is unset. The commands below still pass **`-DCMAKE_BUILD_TYPE=Release`** explicitly so they stay aligned with [building-materialx.md](building-materialx.md).
+
 ## Recommended layout (install prefix under `build/`)
 
 Keep **build artifacts and installs** outside git by using an install prefix under the ignored **`build/`** directory, for example:
@@ -42,6 +44,7 @@ mkdir -p build/logs
 cmake -S "$PWD/third_party/OpenShadingLanguage" \
   -B "$PWD/build/osl-cmake" \
   -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_INSTALL_PREFIX="$PWD/build/osl-dist" \
   -DCMAKE_PREFIX_PATH="$PF" \
   -DSTOP_ON_WARNING=0 \
@@ -56,6 +59,7 @@ ninja -C "$PWD/build/osl-cmake" install >> build/logs/build-osl-install.log 2>&1
   >> build/logs/materialx-submodules.log 2>&1
 
 cmake -S "$PWD/third_party/MaterialX" -B "$PWD/build/materialx-osl" -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
   -DMATERIALX_BUILD_VIEWER=OFF \
   -DMATERIALX_BUILD_RENDER=ON \
   -DMATERIALX_BUILD_RENDER_PLATFORMS=ON \
@@ -91,6 +95,7 @@ mkdir -p build/logs
 cmake -S "$PWD/third_party/OpenShadingLanguage" \
   -B "$PWD/build/osl-cmake" \
   -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_INSTALL_PREFIX="$PWD/build/osl-dist" \
   -DCMAKE_PREFIX_PATH="$PF" \
   -DSTOP_ON_WARNING=0 \
@@ -122,6 +127,7 @@ mkdir -p build/logs
 cmake -S "$PWD/third_party/OpenShadingLanguage" \
   -B "$PWD/build/osl-cmake" \
   -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_INSTALL_PREFIX="$PWD/build/osl-dist" \
   -DSTOP_ON_WARNING=0 \
   >> build/logs/cmake-osl.log 2>&1
@@ -136,6 +142,7 @@ Reconfigure the MaterialX **`materialx-osl`** build so `oslc` / `testrender` pat
 
 ```bash
 cmake -S "$PWD/third_party/MaterialX" -B "$PWD/build/materialx-osl" -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
   -DMATERIALX_BUILD_VIEWER=OFF \
   -DMATERIALX_BUILD_RENDER=ON \
   -DMATERIALX_BUILD_RENDER_PLATFORMS=ON \
