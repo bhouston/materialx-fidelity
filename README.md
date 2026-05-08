@@ -20,17 +20,30 @@ Every material is rendered through MaterialX reference backends and compared sid
 - `packages/cli` - command line tool for running renders.
 - `packages/viewer` - TanStack Start website for browsing fidelity images.
 - `packages/renderer-*` - renderer packages
+- `third_party/MaterialX` - custom MaterialX branch used by the MaterialXView GLSL/Metal and OSL reference renderers
+- `third_party/OpenShadingLanguage` - Open Shading Language sources used to provide **`oslc`** and **`testrender`** for the **`materialx-osl`** renderer (build/install instructions: `docs/building-openshadinglanguage.md`)
+- `third_party/blender` - patched Blender branch with custom MaterialX nodes used by `blender-nodes` and `blender-eevee-nodes`
 - `third_party/blender-materialx-importer` - standalone Blender MaterialX importer used by the Blender fidelity renderers
 - `third_party/three.js` - custom Three.js branch used only by the `threejs-new` renderer
+
+## Building Blender and MaterialX
+
+This repository includes **step-by-step build instructions** for compiling the vendored MaterialX and Blender trees locally (artifacts live under git-ignored `build/`):
+
+- [docs/building-materialx.md](docs/building-materialx.md) — MaterialXView (GLSL/Metal) and `materialx-osl`
+- [docs/building-openshadinglanguage.md](docs/building-openshadinglanguage.md) — Open Shading Language **`oslc`** / **`testrender`** for `materialx-osl` (sources in **`third_party/OpenShadingLanguage`**; install e.g. under `build/osl-dist/`)
+- [docs/BUILDING_BLENDER.md](docs/BUILDING_BLENDER.md) — patched Blender for `blender-nodes` and `blender-eevee-nodes`
+
+The **`materialx-glsl`** and **`materialx-metal`** renderers use MaterialXView binaries built from **`third_party/MaterialX`** (typically under `build/materialx-glsl` / `build/materialx-metal`). **`materialx-osl`** uses **`materialx-osl`** from **`third_party/MaterialX`** **and** relies on an Open Shading Language install for **`oslc`** and **`testrender`** (typically **`third_party/OpenShadingLanguage`** built into `build/osl-dist/` — see the OSL doc). The **`blender-nodes`** and **`blender-eevee-nodes`** renderers use a **custom Blender build from the `third_party/blender` submodule** (see `docs/BUILDING_BLENDER.md`; the patched app bundle is typically under `build/blender/`).
+
+Both docs describe redirecting verbose CMake/Ninja output to log files so builds stay reviewable without flooding terminals or LLM sessions.
 
 ## Requirements
 
 - Node.js 24+
 - pnpm 10+
-- `materialx-glsl` available on your `PATH` for the GLSL reference backend
-- `materialx-metal` available on your `PATH` for the Metal reference backend on macOS
-- `materialx-osl` available on your `PATH` for the OSL reference backend
-- Blender 4.0+ available as `blender` on your `PATH` or via `BLENDER_EXECUTABLE` (`blender-new`, `blender-nodes`, and `blender-eevee-nodes` use the `third_party/blender-materialx-importer` submodule; `blender-nodes` and `blender-eevee-nodes` require the patched Blender executable or `BLENDER_NODES_EXECUTABLE`)
+- MaterialX reference executables built under `build/materialx-*` (see `docs/building-materialx.md`) or available on `PATH`; for **`materialx-osl`**, also an Open Shading Language install with **`oslc`** and **`testrender`** (see `docs/building-openshadinglanguage.md`)
+- Blender 4.0+ available as `blender` on your `PATH` or via `BLENDER_EXECUTABLE`; `blender-nodes` and `blender-eevee-nodes` require the patched Blender executable from `build/blender` (see `docs/BUILDING_BLENDER.md`) or `BLENDER_NODES_EXECUTABLE`
 
 ## Install
 
@@ -54,6 +67,8 @@ pnpm test
 ```
 
 `pnpm build` builds the custom `third_party/three.js` package before the remaining workspace packages so `threejs-new` uses a fresh vendored Three.js build.
+
+For native C++ builds (Blender, MaterialX, Open Shading Language), see [Building Blender and MaterialX](#building-blender-and-materialx) above.
 
 ## CLI
 
@@ -187,7 +202,8 @@ To keep reference renders visually comparable between `materialx-glsl`, `materia
 
 These values are intentionally aligned with `MaterialXView` defaults and its scene normalization behavior in `source/MaterialXView/Viewer.cpp`.
 `threejs-new` resolves Three.js from the custom `third_party/three.js` submodule, including both the core WebGPU/TSL build and `examples/jsm/loaders/MaterialXLoader.js`; `threejs-current` continues to use the npm-installed `three` package.
-The Blender renderers follow the same scene contract through background Python scripts. `blender-new` uses the `third_party/blender-materialx-importer` submodule built on Blender's bundled `MaterialX` module, while `blender-nodes` and `blender-eevee-nodes` use the same importer but require the patched Blender custom MaterialX nodes.
+The **`materialx-glsl`** and **`materialx-metal`** reference renderers prefer MaterialXView binaries built from **`third_party/MaterialX`** (under `build/materialx-*`). **`materialx-osl`** uses the **`materialx-osl`** executable from **`third_party/MaterialX`** and, at run time, the Open Shading Language toolchain (**`oslc`**, **`testrender`**) from an install such as **`build/osl-dist/`** (see [docs/building-openshadinglanguage.md](docs/building-openshadinglanguage.md)).
+The Blender renderers follow the same scene contract through background Python scripts. **`blender-new`** uses the `third_party/blender-materialx-importer` submodule with Blender's bundled MaterialX; **`blender-nodes`** and **`blender-eevee-nodes`** use the same importer but run against the **custom Blender build from the `third_party/blender` submodule** (patched MaterialX nodes).
 
 The importer is intentionally maintained as a separate project. This repository keeps the shader-ball setup, render orchestration, image outputs, metrics, and viewer used to validate its Cycles and Eevee fidelity.
 

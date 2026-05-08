@@ -70,7 +70,8 @@ const BLENDER_RENDERER_OPTIONS: BlenderRendererOptions = {
 function createBlenderNodesExecutableCandidates(packageRoot: string): string[] {
   return [
     ...optionalEnvCandidate(BLENDER_NODES_EXECUTABLE_ENV),
-    join(packageRoot, '..', '..', '..', 'build_darwin', 'bin', 'Blender.app', 'Contents', 'MacOS', 'Blender'),
+    join(packageRoot, '..', '..', 'build', 'blender', 'bin', 'Blender.app', 'Contents', 'MacOS', 'Blender'),
+    'blender',
   ];
 }
 

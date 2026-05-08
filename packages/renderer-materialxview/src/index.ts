@@ -14,9 +14,24 @@ import {
 } from '@material-fidelity/core';
 import type { RenderLogEntry } from '@material-fidelity/samples';
 
-const GLSL_EXECUTABLE_CANDIDATES = ['materialx-glsl', 'materialxview', 'MaterialXView'];
-const METAL_EXECUTABLE_CANDIDATES = ['materialx-metal'];
-const OSL_EXECUTABLE_CANDIDATES = ['materialx-osl'];
+const PACKAGE_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const REPOSITORY_ROOT = join(PACKAGE_ROOT, '..', '..');
+const LOCAL_MATERIALX_SOURCE_ROOT = join(REPOSITORY_ROOT, 'third_party', 'MaterialX');
+const LOCAL_MATERIALX_BUILD_ROOT = join(REPOSITORY_ROOT, 'build');
+const GLSL_EXECUTABLE_CANDIDATES = [
+  join(LOCAL_MATERIALX_BUILD_ROOT, 'materialx-glsl', 'bin', 'MaterialXView'),
+  'materialx-glsl',
+  'materialxview',
+  'MaterialXView',
+];
+const METAL_EXECUTABLE_CANDIDATES = [
+  join(LOCAL_MATERIALX_BUILD_ROOT, 'materialx-metal', 'bin', 'MaterialXView'),
+  'materialx-metal',
+];
+const OSL_EXECUTABLE_CANDIDATES = [
+  join(LOCAL_MATERIALX_BUILD_ROOT, 'materialx-osl', 'bin', 'materialx-osl'),
+  'materialx-osl',
+];
 const MATERIALXVIEW_SEARCH_PATH_ENV = 'MATERIALXVIEW_SEARCH_PATH';
 
 function commandExists(command: string): boolean {
@@ -57,10 +72,17 @@ function inferMaterialXSearchPath(executable: string): string | undefined {
   return undefined;
 }
 
+function localMaterialXSourcePath(): string | undefined {
+  if (existsSync(join(LOCAL_MATERIALX_SOURCE_ROOT, 'libraries')) && existsSync(join(LOCAL_MATERIALX_SOURCE_ROOT, 'resources'))) {
+    return LOCAL_MATERIALX_SOURCE_ROOT;
+  }
+  return undefined;
+}
+
 function resolveExecutable(candidates: string[], rendererName: string): string {
   const match = candidates.find((candidate) => commandExists(candidate));
   if (!match) {
-    throw new Error(`Unable to locate ${rendererName} executable on PATH. Tried: ${candidates.join(', ')}.`);
+    throw new Error(`Unable to locate ${rendererName} executable. Tried: ${candidates.join(', ')}.`);
   }
 
   return match;
@@ -210,6 +232,7 @@ class MaterialXViewRenderer implements FidelityRenderer {
 
     const searchPaths = uniqueSearchPaths([
       ...(process.env[MATERIALXVIEW_SEARCH_PATH_ENV]?.split(delimiter) ?? []),
+      localMaterialXSourcePath(),
       inferMaterialXSearchPath(this.executable),
     ]);
     for (const searchPath of searchPaths) {

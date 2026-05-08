@@ -14,3 +14,14 @@
 	path = third_party/three.js
 	url = git@github.com:bhouston/three.js
 	branch = materialx-upgrade
+[submodule "third_party/blender"]
+	path = third_party/blender
+	url = git@git.blender.org:Ben-Houston/blender.git
+	branch = materialx-noise-nodes
+[submodule "third_party/MaterialX"]
+	path = third_party/MaterialX
+	url = git@github.com:bhouston/MaterialX.git
+	branch = combined2
+[submodule "third_party/OpenShadingLanguage"]
+	path = third_party/OpenShadingLanguage
+	url = https://github.com/AcademySoftwareFoundation/OpenShadingLanguage.git
