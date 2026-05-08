@@ -3,8 +3,14 @@ packages:
   - third_party/material-viewer/packages/*
   - third_party/three.js
 
+allowBuilds:
+  esbuild: true
+  puppeteer: true
+  sharp: true
+
 link-workspace-packages: false
 
 onlyBuiltDependencies:
   - esbuild
+  - puppeteer
   - sharp

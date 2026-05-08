@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.6
-FROM --platform=linux/amd64 node:24-slim AS base
+FROM --platform=linux/amd64 node:26-slim AS base
 
 ENV PNPM_HOME="/pnpm" \
     PATH="$PNPM_HOME:$PATH" \
@@ -7,7 +7,7 @@ ENV PNPM_HOME="/pnpm" \
     PORT=8080 \
     CI=true
 
-RUN npm install -g pnpm@10.33.0
+RUN npm install -g pnpm@11.0.8
 
 WORKDIR /app
 
