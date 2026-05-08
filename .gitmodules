@@ -20,7 +20,7 @@
 	branch = materialx-noise-nodes
 [submodule "third_party/MaterialX"]
 	path = third_party/MaterialX
-	url = git@github.com:bhouston/MaterialX.git
+	url = https://github.com/bhouston/MaterialX.git
 	branch = combined2
 [submodule "third_party/OpenShadingLanguage"]
 	path = third_party/OpenShadingLanguage
