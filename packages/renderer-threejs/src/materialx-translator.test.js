@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { XMLParser } from 'fast-xml-parser';
 import {
@@ -55,6 +56,17 @@ function createDomLikeDocument(text) {
   return {
     documentElement: createDomLikeNode(rootNodeName, parsedTree[rootNodeName]),
   };
+}
+
+function readNodeSample(name) {
+  return readFileSync(
+    new URL(`../../../third_party/material-samples/materials/nodes/${name}/${name}.mtlx`, import.meta.url),
+    'utf8',
+  );
+}
+
+function readMaterialSample(relativePath) {
+  return readFileSync(new URL(`../../../${relativePath}`, import.meta.url), 'utf8');
 }
 
 describe('vendored three.js MaterialX translator contracts', () => {
@@ -239,6 +251,52 @@ describe('vendored three.js MaterialX translator contracts', () => {
       return loader;
     });
     await expect(loader.loadAsync('broken.mtlx')).rejects.toThrow('load failed');
+  });
+
+  it('parses implicit boolean-to-float connections without surfacing issues', () => {
+    const loader = new MaterialXLoader();
+    const result = loader.parseBuffer(
+      readNodeSample('convert_invalid_implicit_boolean_to_float'),
+      'convert_invalid_implicit_boolean_to_float.mtlx',
+    );
+
+    expect(Object.keys(result.materials ?? {})).toEqual(['M_convert_invalid_implicit_boolean_to_float']);
+    expect(result.report.issues).toEqual([]);
+  });
+
+  it('parses implicit float-to-boolean connections without surfacing issues', () => {
+    const loader = new MaterialXLoader();
+    const result = loader.parseBuffer(
+      readNodeSample('convert_invalid_implicit_float_to_boolean'),
+      'convert_invalid_implicit_float_to_boolean.mtlx',
+    );
+
+    expect(Object.keys(result.materials ?? {})).toEqual(['M_convert_invalid_implicit_float_to_boolean']);
+    expect(result.report.issues).toEqual([]);
+  });
+
+  it('parses artistic_ior helper nodes without surfacing issues', () => {
+    const loader = new MaterialXLoader();
+    const result = loader.parseBuffer(
+      readNodeSample('artistic_ior'),
+      'artistic_ior.mtlx',
+    );
+
+    expect(Object.keys(result.materials ?? {})).toEqual(['M_artistic_ior']);
+    expect(result.report.issues).toEqual([]);
+  });
+
+  it('parses artistic_ior multioutput nodegraphs without surfacing issues', () => {
+    const loader = new MaterialXLoader();
+    const result = loader.parseBuffer(
+      readMaterialSample(
+        'third_party/material-samples/materials/surfaces/standard_surface/showcase_graph_pbr_helpers/showcase_graph_pbr_helpers.mtlx',
+      ),
+      'showcase_graph_pbr_helpers.mtlx',
+    );
+
+    expect(Object.keys(result.materials ?? {})).toEqual(['showcase_graph_pbr_helpers']);
+    expect(result.report.issues).toEqual([]);
   });
 
   it('applies strictness policies to unsupported nodes and missing references in real parse flow', () => {

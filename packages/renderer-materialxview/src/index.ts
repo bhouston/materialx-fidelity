@@ -227,7 +227,7 @@ class MaterialXViewRenderer implements FidelityRenderer {
     ];
 
     if (this.options.supportsShadowsOption) {
-      args.push('--shadows', 'false');
+   //   args.push('--shadows', 'false');
     }
 
     const searchPaths = uniqueSearchPaths([

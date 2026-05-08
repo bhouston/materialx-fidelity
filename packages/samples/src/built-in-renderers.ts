@@ -4,7 +4,7 @@ import type { RendererDescriptor } from './types.js';
 export const BUILT_IN_RENDERER_DESCRIPTORS: RendererDescriptor[] = [
   {
     name: 'materialx-glsl',
-    category: 'raytracer',
+    category: 'rasterizer',
     sortIndex: 10,
     description: 'MaterialXView built with the OpenGL/GLSL backend',
     packageName: '@material-fidelity/renderer-materialxview',
@@ -13,7 +13,7 @@ export const BUILT_IN_RENDERER_DESCRIPTORS: RendererDescriptor[] = [
   },
   {
     name: 'materialx-metal',
-    category: 'raytracer',
+    category: 'rasterizer',
     sortIndex: 11,
     description: 'MaterialXView built with the Metal/MSL backend',
     packageName: '@material-fidelity/renderer-materialxview',
